@@ -149,54 +149,27 @@ namespace StackExchange.Redis
                 case 0:
                     value = 0;
                     return false;
-                case 1:
-                    if (s[0] >= '0' && s[0] <= '9')
-                    {
-                        value = (int)(s[0] - '0');
-                        return true;
-                    }
-                    break;
-                case 3:
-                    // RESP3 spec demands inf/nan handling
-                    if (CaseInsensitiveASCIIEqual("inf", s))
-                    {
-                        value = double.PositiveInfinity;
-                        return true;
-                    }
-                    if (CaseInsensitiveASCIIEqual("nan", s))
-                    {
-                        value = double.NaN;
-                        return true;
-                    }
-                    break;
-                case 4:
-                    if (s[0] == '+')
-                    {
-                        if (CaseInsensitiveASCIIEqual("+inf", s))
-                        {
-                            value = double.PositiveInfinity;
-                            return true;
-                        }
-                        if (CaseInsensitiveASCIIEqual("+nan", s))
-                        {
-                            value = double.NaN;
-                            return true;
-                        }
-                    }
-                    else if (s[0] == '-')
-                    {
-                        if (CaseInsensitiveASCIIEqual("-inf", s))
-                        {
-                            value = double.NegativeInfinity;
-                            return true;
-                        }
-                        if (CaseInsensitiveASCIIEqual("-nan", s))
-                        {   // explicitly called out in the spec that we should handle this
-                            value = double.NaN;
-                            return true;
-                        }
-                    }
-                    break;
+                // single-digits
+                case 1 when s[0] >= '0' && s[0] <= '9':
+                    value = s[0] - '0';
+                    return true;
+                // RESP3 spec demands inf/nan handling
+                case 3 when CaseInsensitiveASCIIEqual("inf", s):
+                    value = double.PositiveInfinity;
+                    return true;
+                case 3 when CaseInsensitiveASCIIEqual("nan", s):
+                    value = double.NaN;
+                    return true;
+                case 4 when CaseInsensitiveASCIIEqual("+inf", s):
+                    value = double.PositiveInfinity;
+                    return true;
+                case 4 when CaseInsensitiveASCIIEqual("-inf", s):
+                    value = double.NegativeInfinity;
+                    return true;
+                case 4 when CaseInsensitiveASCIIEqual("+nan", s):
+                case 4 when CaseInsensitiveASCIIEqual("-nan", s):
+                    value = double.NaN;
+                    return true;
             }
             return double.TryParse(s, NumberStyles.Any, NumberFormatInfo.InvariantInfo, out value);
         }
@@ -243,54 +216,27 @@ namespace StackExchange.Redis
                 case 0:
                     value = 0;
                     return false;
-                case 1:
-                    if (s[0] >= '0' && s[0] <= '9')
-                    {
-                        value = (int)(s[0] - '0');
-                        return true;
-                    }
-                    break;
-                case 3:
-                    // RESP3 spec demands inf/nan handling
-                    if (CaseInsensitiveASCIIEqual("inf", s))
-                    {
-                        value = double.PositiveInfinity;
-                        return true;
-                    }
-                    if (CaseInsensitiveASCIIEqual("nan", s))
-                    {
-                        value = double.NaN;
-                        return true;
-                    }
-                    break;
-                case 4:
-                    if (s[0] == '+')
-                    {
-                        if (CaseInsensitiveASCIIEqual("+inf", s))
-                        {
-                            value = double.PositiveInfinity;
-                            return true;
-                        }
-                        if (CaseInsensitiveASCIIEqual("+nan", s))
-                        {
-                            value = double.NaN;
-                            return true;
-                        }
-                    }
-                    else if (s[0] == '-')
-                    {
-                        if (CaseInsensitiveASCIIEqual("-inf", s))
-                        {
-                            value = double.NegativeInfinity;
-                            return true;
-                        }
-                        if (CaseInsensitiveASCIIEqual("-nan", s))
-                        {   // explicitly called out in the spec that we should handle this
-                            value = double.NaN;
-                            return true;
-                        }
-                    }
-                    break;
+                // single-digits
+                case 1 when s[0] >= '0' && s[0] <= '9':
+                    value = s[0] - '0';
+                    return true;
+                // RESP3 spec demands inf/nan handling
+                case 3 when CaseInsensitiveASCIIEqual("inf", s):
+                    value = double.PositiveInfinity;
+                    return true;
+                case 3 when CaseInsensitiveASCIIEqual("nan", s):
+                    value = double.NaN;
+                    return true;
+                case 4 when CaseInsensitiveASCIIEqual("+inf", s):
+                    value = double.PositiveInfinity;
+                    return true;
+                case 4 when CaseInsensitiveASCIIEqual("-inf", s):
+                    value = double.NegativeInfinity;
+                    return true;
+                case 4 when CaseInsensitiveASCIIEqual("+nan", s):
+                case 4 when CaseInsensitiveASCIIEqual("-nan", s):
+                    value = double.NaN;
+                    return true;
             }
             return Utf8Parser.TryParse(s, out value, out int bytes) & bytes == s.Length;
         }
