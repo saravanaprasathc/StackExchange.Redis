@@ -1934,30 +1934,71 @@ namespace StackExchange.Redis
         internal static RawResult TryParseResult(Arena<RawResult> arena, in ReadOnlySequence<byte> buffer, ref BufferReader reader,
             bool includeDetilInExceptions, ServerEndPoint? server, bool allowInlineProtocol = false)
         {
-            var prefix = reader.PeekByte();
-            if (prefix < 0) return RawResult.Nil; // EOF
-            switch (prefix)
+            int prefix;
+            do // this loop is just to allow us to parse (skip) attributes without doing a stack-dive
             {
-                case '+': // simple string
-                    reader.Consume(1);
-                    return ReadLineTerminatedString(ResultType.SimpleString, ref reader);
-                case '-': // error
-                    reader.Consume(1);
-                    return ReadLineTerminatedString(ResultType.Error, ref reader);
-                case ':': // integer
-                    reader.Consume(1);
-                    return ReadLineTerminatedString(ResultType.Integer, ref reader);
-                case '$': // bulk string
-                    reader.Consume(1);
-                    return ReadBulkString(ResultType.BulkString, ref reader, includeDetilInExceptions, server);
-                case '*': // array
-                    reader.Consume(1);
-                    return ReadArray(ResultType.MultiBulk, arena, in buffer, ref reader, includeDetilInExceptions, server);
-                default:
-                    // string s = Format.GetString(buffer);
-                    if (allowInlineProtocol) return ParseInlineProtocol(arena, ReadLineTerminatedString(ResultType.SimpleString, ref reader));
-                    throw new InvalidOperationException("Unexpected response prefix: " + (char)prefix);
-            }
+                prefix = reader.PeekByte();
+                if (prefix < 0) return RawResult.Nil; // EOF
+                switch (prefix)
+                {
+                    // RESP2
+                    case '+': // simple string
+                        reader.Consume(1);
+                        return ReadLineTerminatedString(ResultType.SimpleString, ref reader);
+                    case '-': // error
+                        reader.Consume(1);
+                        return ReadLineTerminatedString(ResultType.Error, ref reader);
+                    case ':': // integer
+                        reader.Consume(1);
+                        return ReadLineTerminatedString(ResultType.Integer, ref reader);
+                    case '$': // bulk string
+                        reader.Consume(1);
+                        return ReadBulkString(ResultType.BulkString, ref reader, includeDetilInExceptions, server);
+                    case '*': // array
+                        reader.Consume(1);
+                        return ReadArray(ResultType.MultiBulk, arena, in buffer, ref reader, includeDetilInExceptions, server);
+
+                    // RESP3
+                    case '_': // null
+                        reader.Consume(1);
+                        return ReadLineTerminatedString(ResultType.Null, ref reader);
+                    case ',': // double
+                        reader.Consume(1);
+                        return ReadLineTerminatedString(ResultType.Double, ref reader);
+                    case '#': // boolean
+                        reader.Consume(1);
+                        return ReadLineTerminatedString(ResultType.Boolean, ref reader);
+                    case '!': // blob error
+                        reader.Consume(1);
+                        return ReadBulkString(ResultType.BlobError, ref reader, includeDetilInExceptions, server);
+                    case '=': // verbatim string
+                        reader.Consume(1);
+                        return ReadBulkString(ResultType.VerbatimString, ref reader, includeDetilInExceptions, server);
+                    case '(': // big number
+                        reader.Consume(1);
+                        return ReadLineTerminatedString(ResultType.BigInteger, ref reader);
+                    case '%': // map
+                        reader.Consume(1);
+                        return ReadArray(ResultType.Map, arena, in buffer, ref reader, includeDetilInExceptions, server);
+                    case '~': // set
+                        reader.Consume(1);
+                        return ReadArray(ResultType.Set, arena, in buffer, ref reader, includeDetilInExceptions, server);
+                    case '|': // attribute
+                              // for now, we want to just skip attribute data
+                        reader.Consume(1);
+                        var arr = ReadArray(ResultType.Attribute, arena, in buffer, ref reader, includeDetilInExceptions, server);
+                        if (arr.IsNull) return RawResult.Nil; // failed to parse attribute data
+
+                        // drop whatever we parsed on the floor and keep looking
+                        break; // exits the SWITCH, not the DO/WHILE
+                    case '>': // push
+                        reader.Consume(1);
+                        return ReadArray(ResultType.Push, arena, in buffer, ref reader, includeDetilInExceptions, server);
+                    default:
+                        if (allowInlineProtocol) return ParseInlineProtocol(arena, ReadLineTerminatedString(ResultType.SimpleString, ref reader));
+                        throw new InvalidOperationException("Unexpected response prefix: " + (char)prefix);
+                }
+            } while (prefix == '|');
         }
 
         private static RawResult ParseInlineProtocol(Arena<RawResult> arena, in RawResult line)

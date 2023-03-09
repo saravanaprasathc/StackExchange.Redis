@@ -424,7 +424,7 @@ namespace StackExchange.Redis
 
         internal bool TryGetDouble(out double val)
         {
-            if (IsNull)
+            if (IsNull || Payload.IsEmpty)
             {
                 val = 0;
                 return false;
@@ -433,6 +433,14 @@ namespace StackExchange.Redis
             {
                 val = i64;
                 return true;
+            }
+
+            if (Payload.IsSingleSegment) return Format.TryParseDouble(Payload.First.Span, out val);
+            if (Payload.Length < 64)
+            {
+                Span<byte> span = stackalloc byte[(int)Payload.Length];
+                Payload.CopyTo(span);
+                return Format.TryParseDouble(span, out val);
             }
             return Format.TryParseDouble(GetString(), out val);
         }
