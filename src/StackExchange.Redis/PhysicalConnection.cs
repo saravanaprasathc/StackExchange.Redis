@@ -1984,11 +1984,11 @@ namespace StackExchange.Redis
                         reader.Consume(1);
                         return ReadArray(ResultType.Set, arena, in buffer, ref reader, includeDetilInExceptions, server);
                     case '|': // attribute
-                              // for now, we want to just skip attribute data
                         reader.Consume(1);
                         var arr = ReadArray(ResultType.Attribute, arena, in buffer, ref reader, includeDetilInExceptions, server);
-                        if (arr.IsNull) return RawResult.Nil; // failed to parse attribute data
+                        if (!arr.HasValue) return RawResult.Nil; // failed to parse attribute data
 
+                        // for now, we want to just skip attribute data; so
                         // drop whatever we parsed on the floor and keep looking
                         break; // exits the SWITCH, not the DO/WHILE
                     case '>': // push
