@@ -1835,7 +1835,7 @@ namespace StackExchange.Redis
                 if (oversized.IsSingleSegment)
                 {
                     var span = oversized.FirstSpan;
-                    for(int i = 0; i < span.Length; i++)
+                    for (int i = 0; i < span.Length; i++)
                     {
                         if (!(span[i] = TryParseResult(arena, in buffer, ref reader, includeDetailInExceptions, server)).HasValue)
                         {
@@ -1845,7 +1845,7 @@ namespace StackExchange.Redis
                 }
                 else
                 {
-                    foreach(var span in oversized.Spans)
+                    foreach (var span in oversized.Spans)
                     {
                         for (int i = 0; i < span.Length; i++)
                         {
