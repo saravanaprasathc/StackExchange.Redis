@@ -1,4 +1,5 @@
-﻿StackExchange.Redis.RedisResult.Resp2Type.get -> StackExchange.Redis.ResultType
+﻿override StackExchange.Redis.Role.Master.Replica.ToString() -> string!
+StackExchange.Redis.RedisResult.Resp2Type.get -> StackExchange.Redis.ResultType
 StackExchange.Redis.RedisResult.Resp3Type.get -> StackExchange.Redis.ResultType
 StackExchange.Redis.RedisResult.Type.get -> StackExchange.Redis.ResultType
 StackExchange.Redis.ResultType.Array = 5 -> StackExchange.Redis.ResultType
