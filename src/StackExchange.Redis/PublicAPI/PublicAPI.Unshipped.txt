@@ -1,15 +1,16 @@
 ﻿StackExchange.Redis.RedisResult.Resp2Type.get -> StackExchange.Redis.ResultType
 StackExchange.Redis.RedisResult.Resp3Type.get -> StackExchange.Redis.ResultType
 StackExchange.Redis.RedisResult.Type.get -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.Attribute = 13 -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.BigInteger = 16 -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.BlobError = 9 -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.Boolean = 8 -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.Double = 7 -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.Hello = 15 -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.Map = 11 -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.Null = 6 -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.Push = 14 -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.Set = 12 -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.VerbatimString = 10 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Array = 5 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Attribute = 29 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.BigInteger = 25 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.BlobError = 10 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Boolean = 17 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Double = 9 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Hello = 45 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Map = 13 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Null = 8 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Push = 37 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Set = 21 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.VerbatimString = 12 -> StackExchange.Redis.ResultType
 virtual StackExchange.Redis.RedisResult.Length.get -> int

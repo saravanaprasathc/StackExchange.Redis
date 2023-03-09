@@ -509,7 +509,7 @@ namespace StackExchange.Redis
                                 return true;
                             }
                             break;
-                        case ResultType.MultiBulk:
+                        case ResultType.Array:
                             if (!tran.IsAborted)
                             {
                                 var arr = result.GetItems();

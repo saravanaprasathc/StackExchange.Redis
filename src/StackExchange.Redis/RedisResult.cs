@@ -27,7 +27,7 @@ namespace StackExchange.Redis
         /// <returns> new <see cref="RedisResult"/>.</returns>
         public static RedisResult Create(RedisValue[] values) =>
             values == null ? NullArray : values.Length == 0 ? EmptyArray :
-                new ArrayRedisResult(Array.ConvertAll(values, value => new SingleRedisResult(value, null)), ResultType.MultiBulk);
+                new ArrayRedisResult(Array.ConvertAll(values, value => new SingleRedisResult(value, null)), ResultType.Array);
 
         /// <summary>
         /// Create a new RedisResult representing an array of values.
@@ -35,12 +35,12 @@ namespace StackExchange.Redis
         /// <param name="values">The <see cref="RedisResult"/>s to create a result from.</param>
         /// <returns> new <see cref="RedisResult"/>.</returns>
         public static RedisResult Create(RedisResult[] values)
-            => values == null ? NullArray : values.Length == 0 ? EmptyArray : new ArrayRedisResult(values, ResultType.MultiBulk);
+            => values == null ? NullArray : values.Length == 0 ? EmptyArray : new ArrayRedisResult(values, ResultType.Array);
 
         /// <summary>
         /// An empty array result.
         /// </summary>
-        internal static RedisResult EmptyArray { get; } = new ArrayRedisResult(Array.Empty<RedisResult>(), ResultType.MultiBulk);
+        internal static RedisResult EmptyArray { get; } = new ArrayRedisResult(Array.Empty<RedisResult>(), ResultType.Array);
 
         /// <summary>
         /// A null array result.
@@ -72,7 +72,7 @@ namespace StackExchange.Redis
                     case ResultType.BulkString:
                         redisResult = new SingleRedisResult(result.AsRedisValue(), result.Resp3Type);
                         return true;
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         if (result.IsNull)
                         {
                             redisResult = NullArray;
@@ -313,7 +313,7 @@ namespace StackExchange.Redis
             public override bool IsNull => _value is null;
             private readonly RedisResult[]? _value;
 
-            internal override ResultType Resp2NullType => ResultType.MultiBulk;
+            internal override ResultType Resp2NullType => ResultType.Array;
 
             public ArrayRedisResult(RedisResult[]? value, ResultType resultType) : base(value is null ? ResultType.Null : resultType)
             {

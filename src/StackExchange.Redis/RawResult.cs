@@ -54,7 +54,7 @@ namespace StackExchange.Redis
             bool isNull = false;
             switch (resultType)
             {
-                case ResultType.MultiBulk:
+                case ResultType.Array:
                 case ResultType.Map:
                 case ResultType.Set:
                 case ResultType.Attribute:
@@ -63,7 +63,7 @@ namespace StackExchange.Redis
                     break;
                 case ResultType.Null:
                     isNull = true;
-                    resultType = ResultType.MultiBulk; // so we can reconstruct valid RESP2
+                    resultType = ResultType.Array; // so we can reconstruct valid RESP2
                     break;
                 default:
                     ThrowInvalidType(resultType);
@@ -81,7 +81,7 @@ namespace StackExchange.Redis
 
         public ResultType Resp3Type => IsNull ? ResultType.Null : (_resp3type & ~NonNullFlag);
 
-        public ResultType Resp2Type => (_resp3type & ~NonNullFlag).ToResp2();
+        public ResultType Resp2Type => _resp3type.ToResp2(); // note null already handled
 
         internal bool IsNull => (_resp3type & NonNullFlag) == 0;
         public bool HasValue => Resp3Type != ResultType.None;
@@ -94,7 +94,7 @@ namespace StackExchange.Redis
             {
                 ResultType.SimpleString or ResultType.Integer or ResultType.Error => $"{Resp3Type}: {GetString()}",
                 ResultType.BulkString => $"{Resp3Type}: {Payload.Length} bytes",
-                ResultType.MultiBulk => $"{Resp3Type}: {ItemsCount} items",
+                ResultType.Array => $"{Resp3Type}: {ItemsCount} items",
                 _ => $"(unknown: {Resp3Type})",
             };
         }

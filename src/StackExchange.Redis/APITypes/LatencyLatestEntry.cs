@@ -13,7 +13,7 @@ public readonly struct LatencyLatestEntry
     {
         protected override bool TryParse(in RawResult raw, out LatencyLatestEntry parsed)
         {
-            if (raw.Resp2Type == ResultType.MultiBulk)
+            if (raw.Resp2Type == ResultType.Array)
             {
                 var items = raw.GetItems();
                 if (items.Length >= 4

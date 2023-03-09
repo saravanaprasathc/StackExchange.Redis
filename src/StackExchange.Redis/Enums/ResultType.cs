@@ -1,4 +1,6 @@
-﻿namespace StackExchange.Redis
+﻿using System;
+
+namespace StackExchange.Redis
 {
     /// <summary>
     /// The underlying result type as defined by Redis.
@@ -31,64 +33,73 @@
         /// <summary>
         /// Multi-bulk replies represent complex results such as arrays.
         /// </summary>
+        [Obsolete("Please use " + nameof(Array))]
         MultiBulk = 5,
 
+        /// <summary>
+        /// Multi-bulk replies represent complex results such as arrays.
+        /// </summary>
+        Array = 5,
+
         // RESP3: https://github.com/redis/redis-specifications/blob/master/protocol/RESP3.md
+
+        // note: we will arrange the values such as the last 3 bits are the RESP2 equivalent,
+        // and then we count up from there
 
         /// <summary>
         /// A single null value replacing RESP v2 blob and multi-bulk nulls.
         /// </summary>
-        Null = 6,
+        Null = (1 << 3) | None,
 
         /// <summary>
         /// A floating point number.
         /// </summary>
-        Double = 7,
+        Double = (1 << 3) | SimpleString,
 
         /// <summary>
         /// True or false.
         /// </summary>
-        Boolean = 8,
-
-        /// <summary>
-        /// Binary safe error code and message.
-        /// </summary>
-        BlobError = 9,
-
-        /// <summary>
-        /// A binary safe string that should be displayed to humans without any escaping or filtering. For instance the output of <c>LATENCY DOCTOR</c> in Redis.
-        /// </summary>
-        VerbatimString = 10,
-
-        /// <summary>
-        /// An unordered collection of key-value pairs. Keys and values can be any other RESP3 type.
-        /// </summary>
-        Map = 11,
-
-        /// <summary>
-        /// An unordered collection of N other types.
-        /// </summary>
-        Set = 12,
-
-        /// <summary>
-        /// Like the <see cref="Map"/> type, but the client should keep reading the reply ignoring the attribute type, and return it to the client as additional information.
-        /// </summary>
-        Attribute = 13,
-
-        /// <summary>
-        /// Out of band data. The format is like the <see cref="MultiBulk"/> type, but the client should just check the first string element, stating the type of the out of band data, a call a callback if there is one registered for this specific type of push information. Push types are not related to replies, since they are information that the server may push at any time in the connection, so the client should keep reading if it is reading the reply of a command.
-        /// </summary>
-        Push = 14,
-
-        /// <summary>
-        /// Like the <see cref="Map"/> type, but is sent only when the connection between the client and the server is established, in order to welcome the client with different information like the name of the server, its version, and so forth.
-        /// </summary>
-        Hello = 15,
+        Boolean = (2 << 3) | SimpleString,
 
         /// <summary>
         /// A large number non representable by the <see cref="Integer"/> type
         /// </summary>
-        BigInteger = 16,
+        BigInteger = (3 << 3) | SimpleString,
+
+        /// <summary>
+        /// Binary safe error code and message.
+        /// </summary>
+        BlobError = (1 << 3) | Error,
+
+        /// <summary>
+        /// A binary safe string that should be displayed to humans without any escaping or filtering. For instance the output of <c>LATENCY DOCTOR</c> in Redis.
+        /// </summary>
+        VerbatimString = (1 << 3) | BulkString,
+
+        /// <summary>
+        /// An unordered collection of key-value pairs. Keys and values can be any other RESP3 type.
+        /// </summary>
+        Map = (1 << 3) | Array,
+
+        /// <summary>
+        /// An unordered collection of N other types.
+        /// </summary>
+        Set = (2 << 3) | Array,
+
+        /// <summary>
+        /// Like the <see cref="Map"/> type, but the client should keep reading the reply ignoring the attribute type, and return it to the client as additional information.
+        /// </summary>
+        Attribute = (3 << 3) | Array,
+
+        /// <summary>
+        /// Out of band data. The format is like the <see cref="MultiBulk"/> type, but the client should just check the first string element, stating the type of the out of band data, a call a callback if there is one registered for this specific type of push information. Push types are not related to replies, since they are information that the server may push at any time in the connection, so the client should keep reading if it is reading the reply of a command.
+        /// </summary>
+        Push = (4 << 3) | Array,
+
+        /// <summary>
+        /// Like the <see cref="Map"/> type, but is sent only when the connection between the client and the server is established, in order to welcome the client with different information like the name of the server, its version, and so forth.
+        /// </summary>
+        Hello = (5 << 3) | Array,
 
         // WARNING: 128+ (high bit) used for null mask; DO NOT USE
     }

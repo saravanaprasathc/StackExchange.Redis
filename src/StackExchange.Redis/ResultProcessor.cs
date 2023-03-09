@@ -453,7 +453,7 @@ namespace StackExchange.Redis
 
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.MultiBulk)
+                if (result.Resp2Type == ResultType.Array)
                 {
                     var items = result.GetItems();
                     if (items.Length >= 3 && items[2].TryGetInt64(out long count))
@@ -574,7 +574,7 @@ namespace StackExchange.Redis
             {
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var arr = result.GetItems();
                         if (result.IsNull || arr.Length < 2)
                         {
@@ -612,7 +612,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.MultiBulk)
+                if (result.Resp2Type == ResultType.Array)
                 {
                     if (result.IsNull)
                     {
@@ -633,7 +633,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.MultiBulk)
+                if (result.Resp2Type == ResultType.Array)
                 {
                     if (result.IsNull)
                     {
@@ -667,7 +667,7 @@ namespace StackExchange.Redis
                 count = 0;
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var arr = result.GetItems();
                         if (result.IsNull)
                         {
@@ -837,7 +837,7 @@ namespace StackExchange.Redis
                         }
                         SetResult(message, true);
                         return true;
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         if (message?.Command == RedisCommand.CONFIG)
                         {
                             var iter = result.GetItems().GetEnumerator();
@@ -929,7 +929,7 @@ namespace StackExchange.Redis
                     case ResultType.BulkString:
                         SetResult(message, result.GetBoolean());
                         return true;
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var items = result.GetItems();
                         if (items.Length == 1)
                         { // treat an array of 1 like a single reply (for example, SCRIPT EXISTS)
@@ -1032,7 +1032,7 @@ namespace StackExchange.Redis
                             return true;
                         }
                         break;
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var arr = result.GetItems();
                         switch (arr.Length)
                         {
@@ -1221,7 +1221,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.MultiBulk)
+                if (result.Resp2Type == ResultType.Array)
                 {
                     var arr = result.GetItems();
                     if (arr.Length == 2 && arr[1].TryGetInt64(out long val))
@@ -1238,7 +1238,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.MultiBulk && !result.IsNull)
+                if (result.Resp2Type == ResultType.Array && !result.IsNull)
                 {
                     var arr = result.GetItemsAsDoubles()!;
                     SetResult(message, arr);
@@ -1322,7 +1322,7 @@ namespace StackExchange.Redis
             {
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var final = result.ToArray(
                                 (in RawResult item, in ChannelState state) => item.AsRedisChannel(state.Prefix, state.Mode),
                                 new ChannelState(connection.ChannelPrefix, mode))!;
@@ -1340,7 +1340,7 @@ namespace StackExchange.Redis
             {
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var arr = result.GetItemsAsKeys()!;
                         SetResult(message, arr);
                         return true;
@@ -1398,7 +1398,7 @@ namespace StackExchange.Redis
                             : new[] { result.AsRedisValue() };
                         SetResult(message, arr);
                         return true;
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         arr = result.GetItemsAsValues()!;
                         SetResult(message, arr);
                         return true;
@@ -1411,7 +1411,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.MultiBulk && !result.IsNull)
+                if (result.Resp2Type == ResultType.Array && !result.IsNull)
                 {
                     var arr = result.ToArray((in RawResult x) => (long)x.AsRedisValue())!;
                     SetResult(message, arr);
@@ -1428,7 +1428,7 @@ namespace StackExchange.Redis
             {
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var arr = result.GetItemsAsStrings()!;
 
                         SetResult(message, arr);
@@ -1444,7 +1444,7 @@ namespace StackExchange.Redis
             {
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var arr = result.GetItemsAsStringsNotNullable()!;
                         SetResult(message, arr);
                         return true;
@@ -1457,7 +1457,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.MultiBulk && !result.IsNull)
+                if (result.Resp2Type == ResultType.Array && !result.IsNull)
                 {
                     var arr = result.GetItemsAsBooleans()!;
                     SetResult(message, arr);
@@ -1473,7 +1473,7 @@ namespace StackExchange.Redis
             {
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var pos = result.GetItemsAsGeoPosition();
 
                         SetResult(message, pos);
@@ -1489,7 +1489,7 @@ namespace StackExchange.Redis
             {
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var arr = result.GetItemsAsGeoPositionArray()!;
 
                         SetResult(message, arr);
@@ -1526,7 +1526,7 @@ namespace StackExchange.Redis
             {
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var typed = result.ToArray(
                             (in RawResult item, in GeoRadiusOptions radiusOptions) => Parse(item, radiusOptions), options)!;
                         SetResult(message, typed);
@@ -1589,7 +1589,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                 switch (result.Resp2Type)
                 {
                     case ResultType.BulkString:
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         SetResult(message, Parse(result));
                         return true;
                 }
@@ -1825,7 +1825,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                     return true;
                 }
 
-                if (result.Resp2Type != ResultType.MultiBulk)
+                if (result.Resp2Type != ResultType.Array)
                 {
                     return false;
                 }
@@ -1906,7 +1906,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                     return true;
                 }
 
-                if (result.Resp2Type != ResultType.MultiBulk)
+                if (result.Resp2Type != ResultType.Array)
                 {
                     return false;
                 }
@@ -1935,7 +1935,7 @@ The coordinates as a two items x,y array (longitude,latitude).
             {
                 // See https://redis.io/commands/xautoclaim for command documentation.
                 // Note that the result should never be null, so intentionally treating it as a failure to parse here
-                if (result.Resp2Type == ResultType.MultiBulk && !result.IsNull)
+                if (result.Resp2Type == ResultType.Array && !result.IsNull)
                 {
                     var items = result.GetItems();
 
@@ -1964,7 +1964,7 @@ The coordinates as a two items x,y array (longitude,latitude).
             {
                 // See https://redis.io/commands/xautoclaim for command documentation.
                 // Note that the result should never be null, so intentionally treating it as a failure to parse here
-                if (result.Resp2Type == ResultType.MultiBulk && !result.IsNull)
+                if (result.Resp2Type == ResultType.Array && !result.IsNull)
                 {
                     var items = result.GetItems();
 
@@ -2112,7 +2112,7 @@ The coordinates as a two items x,y array (longitude,latitude).
 
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type != ResultType.MultiBulk)
+                if (result.Resp2Type != ResultType.Array)
                 {
                     return false;
                 }
@@ -2149,7 +2149,7 @@ The coordinates as a two items x,y array (longitude,latitude).
             //        2) "banana"
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type != ResultType.MultiBulk)
+                if (result.Resp2Type != ResultType.Array)
                 {
                     return false;
                 }
@@ -2225,7 +2225,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                 // 5) 1) 1) "Joe"
                 //       2) "8"
 
-                if (result.Resp2Type != ResultType.MultiBulk)
+                if (result.Resp2Type != ResultType.Array)
                 {
                     return false;
                 }
@@ -2269,7 +2269,7 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type != ResultType.MultiBulk)
+                if (result.Resp2Type != ResultType.Array)
                 {
                     return false;
                 }
@@ -2296,7 +2296,7 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             protected static StreamEntry ParseRedisStreamEntry(in RawResult item)
             {
-                if (item.IsNull || item.Resp2Type != ResultType.MultiBulk)
+                if (item.IsNull || item.Resp2Type != ResultType.Array)
                 {
                     return StreamEntry.Null;
                 }
@@ -2328,7 +2328,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                 //       3) "temperature"
                 //       4) "18.2"
 
-                if (result.Resp2Type != ResultType.MultiBulk || result.IsNull)
+                if (result.Resp2Type != ResultType.Array || result.IsNull)
                 {
                     return Array.Empty<NameValueEntry>();
                 }
@@ -2370,7 +2370,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                     case ResultType.BulkString:
                         SetResult(message, result.GetString());
                         return true;
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var arr = result.GetItems();
                         if (arr.Length == 1)
                         {
@@ -2457,7 +2457,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                             case ResultType.SimpleString:
                                 happy = result.IsEqual(CommonReplies.PONG);
                                 break;
-                            case ResultType.MultiBulk:
+                            case ResultType.Array:
                                 if (result.ItemsCount == 2)
                                 {
                                     var items = result.GetItems();
@@ -2474,7 +2474,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                         }
                         break;
                     case RedisCommand.TIME:
-                        happy = result.Resp2Type == ResultType.MultiBulk && result.GetItems().Length == 2;
+                        happy = result.Resp2Type == ResultType.Array && result.GetItems().Length == 2;
                         break;
                     case RedisCommand.EXISTS:
                         happy = result.Resp2Type == ResultType.Integer;
@@ -2508,7 +2508,7 @@ The coordinates as a two items x,y array (longitude,latitude).
             {
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var items = result.GetItems();
                         if (result.IsNull)
                         {
@@ -2538,7 +2538,7 @@ The coordinates as a two items x,y array (longitude,latitude).
 
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         foreach (RawResult item in result.GetItems())
                         {
                             var pairs = item.GetItems();
@@ -2572,7 +2572,7 @@ The coordinates as a two items x,y array (longitude,latitude).
 
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         foreach (RawResult item in result.GetItems())
                         {
                             var pairs = item.GetItems();
@@ -2614,7 +2614,7 @@ The coordinates as a two items x,y array (longitude,latitude).
 
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var arrayOfArrays = result.GetItems();
 
                         var returnArray = result.ToArray<KeyValuePair<string, string>[], StringPairInterleavedProcessor>(
@@ -2656,7 +2656,7 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             switch(result.Resp2Type)
             {
-                case ResultType.MultiBulk:
+                case ResultType.Array:
                     var items = result.GetItems();
                     T[] arr;
                     if (items.IsEmpty)

@@ -15,8 +15,8 @@ public class RawResultTests
     [Fact]
     public void NullWorks()
     {
-        var result = new RawResult(ResultType.BulkString, ReadOnlySequence<byte>.Empty, true);
-        Assert.Equal(ResultType.BulkString, result.Type);
+        var result = new RawResult(ResultType.Null, ReadOnlySequence<byte>.Empty);
+        Assert.Equal(ResultType.BulkString, result.Resp2Type);
         Assert.True(result.IsNull);
 
         var value = result.AsRedisValue();
@@ -33,7 +33,7 @@ public class RawResultTests
     public void DefaultWorks()
     {
         var result = default(RawResult);
-        Assert.Equal(ResultType.None, result.Type);
+        Assert.Equal(ResultType.None, result.Resp2Type);
         Assert.True(result.IsNull);
 
         var value = result.AsRedisValue();
@@ -50,7 +50,7 @@ public class RawResultTests
     public void NilWorks()
     {
         var result = RawResult.Nil;
-        Assert.Equal(ResultType.None, result.Type);
+        Assert.Equal(ResultType.None, result.Resp2Type);
         Assert.True(result.IsNull);
 
         var value = result.AsRedisValue();

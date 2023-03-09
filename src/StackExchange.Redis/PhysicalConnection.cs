@@ -1527,7 +1527,7 @@ namespace StackExchange.Redis
         private void MatchResult(in RawResult result)
         {
             // check to see if it could be an out-of-band pubsub message
-            if ((connectionType == ConnectionType.Subscription && result.Resp2Type == ResultType.MultiBulk) || result.Resp3Type == ResultType.Push)
+            if ((connectionType == ConnectionType.Subscription && result.Resp2Type == ResultType.Array) || result.Resp3Type == ResultType.Push)
             {
                 var muxer = BridgeCouldBeNull?.Multiplexer;
                 if (muxer == null) return;
@@ -1620,7 +1620,7 @@ namespace StackExchange.Redis
                     case ResultType.BulkString:
                         parsed = value.AsRedisValue();
                         return true;
-                    case ResultType.MultiBulk when allowArraySingleton && value.ItemsCount == 1:
+                    case ResultType.Array when allowArraySingleton && value.ItemsCount == 1:
                         return TryGetPubSubPayload(in value[0], out parsed, allowArraySingleton: false);
                 }
                 parsed = default;
@@ -1956,7 +1956,7 @@ namespace StackExchange.Redis
                         return ReadBulkString(ResultType.BulkString, ref reader, includeDetilInExceptions, server);
                     case '*': // array
                         reader.Consume(1);
-                        return ReadArray(ResultType.MultiBulk, arena, in buffer, ref reader, includeDetilInExceptions, server);
+                        return ReadArray(ResultType.Array, arena, in buffer, ref reader, includeDetilInExceptions, server);
 
                     // RESP3
                     case '_': // null
@@ -2014,7 +2014,7 @@ namespace StackExchange.Redis
             {   // this assigns *via a reference*, returned via the iterator; just... sweet
                 iter.GetNext() = new RawResult(line.Resp2Type, token); // spoof RESP2 from RESP1
             }
-            return new RawResult(ResultType.MultiBulk, block); // spoof RESP2 from RESP1
+            return new RawResult(ResultType.Array, block); // spoof RESP2 from RESP1
         }
     }
 }

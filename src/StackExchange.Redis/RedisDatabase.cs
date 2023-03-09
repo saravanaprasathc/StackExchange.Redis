@@ -4704,12 +4704,12 @@ namespace StackExchange.Redis
             {
                 switch (result.Resp2Type)
                 {
-                    case ResultType.MultiBulk:
+                    case ResultType.Array:
                         var arr = result.GetItems();
                         if (arr.Length == 2)
                         {
                             ref RawResult inner = ref arr[1];
-                            if (inner.Resp2Type == ResultType.MultiBulk && arr[0].TryGetInt64(out var i64))
+                            if (inner.Resp2Type == ResultType.Array && arr[0].TryGetInt64(out var i64))
                             {
                                 T[]? oversized = Parse(inner, out int count);
                                 var sscanResult = new ScanEnumerable<T>.ScanResult(i64, oversized, count, true);

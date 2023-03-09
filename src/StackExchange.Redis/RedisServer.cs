@@ -925,10 +925,10 @@ namespace StackExchange.Redis
                 {
                     switch (result.Resp2Type)
                     {
-                        case ResultType.MultiBulk:
+                        case ResultType.Array:
                             var arr = result.GetItems();
                             RawResult inner;
-                            if (arr.Length == 2 && (inner = arr[1]).Resp2Type == ResultType.MultiBulk)
+                            if (arr.Length == 2 && (inner = arr[1]).Resp2Type == ResultType.Array)
                             {
                                 var items = inner.GetItems();
                                 RedisKey[] keys;
