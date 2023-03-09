@@ -79,9 +79,6 @@ namespace StackExchange.Redis
 
         public bool IsError => Resp3Type.IsError();
 
-        [Obsolete($"Please use either {nameof(Resp2Type)} (simplified) or {nameof(Resp3Type)} (full)")]
-        public ResultType Type => Resp2Type;
-
         public ResultType Resp3Type => IsNull ? ResultType.Null : (_resp3type & ~NonNullFlag);
 
         public ResultType Resp2Type => (_resp3type & ~NonNullFlag).ToResp2();

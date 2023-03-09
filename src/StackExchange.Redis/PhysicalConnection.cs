@@ -1994,11 +1994,11 @@ namespace StackExchange.Redis
                     case '>': // push
                         reader.Consume(1);
                         return ReadArray(ResultType.Push, arena, in buffer, ref reader, includeDetilInExceptions, server);
-                    default:
-                        if (allowInlineProtocol) return ParseInlineProtocol(arena, ReadLineTerminatedString(ResultType.SimpleString, ref reader));
-                        throw new InvalidOperationException("Unexpected response prefix: " + (char)prefix);
                 }
             } while (prefix == '|');
+
+            if (allowInlineProtocol) return ParseInlineProtocol(arena, ReadLineTerminatedString(ResultType.SimpleString, ref reader));
+            throw new InvalidOperationException("Unexpected response prefix: " + (char)prefix);
         }
 
         private static RawResult ParseInlineProtocol(Arena<RawResult> arena, in RawResult line)
