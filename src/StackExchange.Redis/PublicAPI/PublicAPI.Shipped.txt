@@ -1325,7 +1325,6 @@ StackExchange.Redis.RedisKey.Prepend(StackExchange.Redis.RedisKey prefix) -> Sta
 StackExchange.Redis.RedisKey.RedisKey() -> void
 StackExchange.Redis.RedisKey.RedisKey(string? key) -> void
 StackExchange.Redis.RedisResult
-StackExchange.Redis.RedisResult.RedisResult() -> void
 StackExchange.Redis.RedisResult.ToDictionary(System.Collections.Generic.IEqualityComparer<string!>? comparer = null) -> System.Collections.Generic.Dictionary<string!, StackExchange.Redis.RedisResult!>!
 StackExchange.Redis.RedisServerException
 StackExchange.Redis.RedisServerException.RedisServerException(string! message) -> void
