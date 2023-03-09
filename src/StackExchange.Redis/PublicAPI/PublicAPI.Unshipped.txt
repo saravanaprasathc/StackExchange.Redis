@@ -1,1 +1,15 @@
-﻿
+﻿StackExchange.Redis.RedisResult.Resp2Type.get -> StackExchange.Redis.ResultType
+StackExchange.Redis.RedisResult.Resp3Type.get -> StackExchange.Redis.ResultType
+StackExchange.Redis.RedisResult.Type.get -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Attribute = 13 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.BigInteger = 16 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.BlobError = 9 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Boolean = 8 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Double = 7 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Hello = 15 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Map = 11 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Null = 6 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Push = 14 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.Set = 12 -> StackExchange.Redis.ResultType
+StackExchange.Redis.ResultType.VerbatimString = 10 -> StackExchange.Redis.ResultType
+virtual StackExchange.Redis.RedisResult.Length.get -> int

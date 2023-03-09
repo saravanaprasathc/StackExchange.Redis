@@ -1,8 +1,8 @@
-﻿using System;
+﻿using Pipelines.Sockets.Unofficial.Arenas;
+using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Pipelines.Sockets.Unofficial.Arenas;
 
 namespace StackExchange.Redis
 {
@@ -13,57 +13,92 @@ namespace StackExchange.Redis
         internal int ItemsCount => (int)_items.Length;
         internal ReadOnlySequence<byte> Payload { get; }
 
-        internal static readonly RawResult NullMultiBulk = new RawResult(default(Sequence<RawResult>), isNull: true);
-        internal static readonly RawResult EmptyMultiBulk = new RawResult(default(Sequence<RawResult>), isNull: false);
+        internal static readonly RawResult NullMultiBulk = new RawResult(ResultType.Null, default(Sequence<RawResult>));
+        internal static readonly RawResult EmptyMultiBulk = new RawResult(ResultType.Null, default(Sequence<RawResult>));
         internal static readonly RawResult Nil = default;
         // Note: can't use Memory<RawResult> here - struct recursion breaks runtime
         private readonly Sequence _items;
-        private readonly ResultType _type;
+        private readonly ResultType _resp3type;
 
         private const ResultType NonNullFlag = (ResultType)128;
 
-        public RawResult(ResultType resultType, in ReadOnlySequence<byte> payload, bool isNull)
+        public RawResult(ResultType resultType, in ReadOnlySequence<byte> payload)
         {
+            bool isNull = false;
             switch (resultType)
             {
                 case ResultType.SimpleString:
                 case ResultType.Error:
                 case ResultType.Integer:
                 case ResultType.BulkString:
+                case ResultType.Double:
+                case ResultType.BlobError:
+                case ResultType.VerbatimString:
+                case ResultType.BigInteger:
+                    break;
+                case ResultType.Null:
+                    isNull = true;
+                    resultType = ResultType.BulkString; // so we can reconstruct valid RESP2
                     break;
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(resultType));
+                    ThrowInvalidType(resultType);
+                    break;
             }
-            if (!isNull) resultType |= NonNullFlag;
-            _type = resultType;
+            _resp3type = isNull ? resultType : (resultType | NonNullFlag);
             Payload = payload;
             _items = default;
         }
 
-        public RawResult(Sequence<RawResult> items, bool isNull)
+        public RawResult(ResultType resultType, Sequence<RawResult> items)
         {
-            _type = isNull ? ResultType.MultiBulk : (ResultType.MultiBulk | NonNullFlag);
+            bool isNull = false;
+            switch (resultType)
+            {
+                case ResultType.MultiBulk:
+                case ResultType.Map:
+                case ResultType.Set:
+                case ResultType.Attribute:
+                case ResultType.Push:
+                case ResultType.Hello:
+                    break;
+                case ResultType.Null:
+                    isNull = true;
+                    resultType = ResultType.MultiBulk; // so we can reconstruct valid RESP2
+                    break;
+                default:
+                    ThrowInvalidType(resultType);
+                    break;
+            }
+            _resp3type = isNull ? resultType : (resultType | NonNullFlag);
             Payload = default;
             _items = items.Untyped();
         }
 
-        public bool IsError => Type == ResultType.Error;
+        private static void ThrowInvalidType(ResultType resultType)
+             => throw new ArgumentOutOfRangeException(nameof(resultType), $"Invalid result-type: {resultType}");
 
-        public ResultType Type => _type & ~NonNullFlag;
+        public bool IsError => Resp3Type.IsError();
 
-        internal bool IsNull => (_type & NonNullFlag) == 0;
-        public bool HasValue => Type != ResultType.None;
+        [Obsolete($"Please use either {nameof(Resp2Type)} (simplified) or {nameof(Resp3Type)} (full)")]
+        public ResultType Type => Resp2Type;
+
+        public ResultType Resp3Type => IsNull ? ResultType.Null : (_resp3type & ~NonNullFlag);
+
+        public ResultType Resp2Type => (_resp3type & ~NonNullFlag).ToResp2();
+
+        internal bool IsNull => (_resp3type & NonNullFlag) == 0;
+        public bool HasValue => Resp3Type != ResultType.None;
 
         public override string ToString()
         {
             if (IsNull) return "(null)";
 
-            return Type switch
+            return Resp2Type switch
             {
-                ResultType.SimpleString or ResultType.Integer or ResultType.Error => $"{Type}: {GetString()}",
-                ResultType.BulkString => $"{Type}: {Payload.Length} bytes",
-                ResultType.MultiBulk => $"{Type}: {ItemsCount} items",
-                _ => $"(unknown: {Type})",
+                ResultType.SimpleString or ResultType.Integer or ResultType.Error => $"{Resp3Type}: {GetString()}",
+                ResultType.BulkString => $"{Resp3Type}: {Payload.Length} bytes",
+                ResultType.MultiBulk => $"{Resp3Type}: {ItemsCount} items",
+                _ => $"(unknown: {Resp3Type})",
             };
         }
 
@@ -119,7 +154,7 @@ namespace StackExchange.Redis
         }
         internal RedisChannel AsRedisChannel(byte[]? channelPrefix, RedisChannel.PatternMode mode)
         {
-            switch (Type)
+            switch (Resp2Type)
             {
                 case ResultType.SimpleString:
                 case ResultType.BulkString:
@@ -134,20 +169,31 @@ namespace StackExchange.Redis
                     }
                     return default;
                 default:
-                    throw new InvalidCastException("Cannot convert to RedisChannel: " + Type);
+                    throw new InvalidCastException("Cannot convert to RedisChannel: " + Resp3Type);
             }
         }
 
-        internal RedisKey AsRedisKey() => Type switch
+        internal RedisKey AsRedisKey()
         {
-            ResultType.SimpleString or ResultType.BulkString => (RedisKey)GetBlob(),
-            _ => throw new InvalidCastException("Cannot convert to RedisKey: " + Type),
-        };
+            return Resp2Type switch
+            {
+                ResultType.SimpleString or ResultType.BulkString => (RedisKey)GetBlob(),
+                _ => throw new InvalidCastException("Cannot convert to RedisKey: " + Resp3Type),
+            };
+        }
 
         internal RedisValue AsRedisValue()
         {
             if (IsNull) return RedisValue.Null;
-            switch (Type)
+            if (Resp3Type == ResultType.Boolean && Payload.Length == 1)
+            {
+                switch (Payload.First.Span[0])
+                {
+                    case (byte)'t': return (RedisValue)true;
+                    case (byte)'f': return (RedisValue)false;
+                };
+            }
+            switch (Resp2Type)
             {
                 case ResultType.Integer:
                     long i64;
@@ -157,13 +203,13 @@ namespace StackExchange.Redis
                 case ResultType.BulkString:
                     return (RedisValue)GetBlob();
             }
-            throw new InvalidCastException("Cannot convert to RedisValue: " + Type);
+            throw new InvalidCastException("Cannot convert to RedisValue: " + Resp3Type);
         }
 
         internal Lease<byte>? AsLease()
         {
             if (IsNull) return null;
-            switch (Type)
+            switch (Resp2Type)
             {
                 case ResultType.SimpleString:
                 case ResultType.BulkString:
@@ -172,7 +218,7 @@ namespace StackExchange.Redis
                     payload.CopyTo(lease.Span);
                     return lease;
             }
-            throw new InvalidCastException("Cannot convert to Lease: " + Type);
+            throw new InvalidCastException("Cannot convert to Lease: " + Resp3Type);
         }
 
         internal bool IsEqual(in CommandBytes expected)
@@ -242,6 +288,15 @@ namespace StackExchange.Redis
         internal bool GetBoolean()
         {
             if (Payload.Length != 1) throw new InvalidCastException();
+            if (Resp3Type == ResultType.Boolean)
+            {
+                return Payload.First.Span[0] switch
+                {
+                    (byte)'t' => true,
+                    (byte)'f' => false,
+                    _ => throw new InvalidCastException(),
+                };
+            }
             return Payload.First.Span[0] switch
             {
                 (byte)'1' => true,

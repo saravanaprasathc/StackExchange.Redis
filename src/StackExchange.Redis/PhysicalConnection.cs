@@ -1527,7 +1527,7 @@ namespace StackExchange.Redis
         private void MatchResult(in RawResult result)
         {
             // check to see if it could be an out-of-band pubsub message
-            if (connectionType == ConnectionType.Subscription && result.Type == ResultType.MultiBulk)
+            if ((connectionType == ConnectionType.Subscription && result.Resp2Type == ResultType.MultiBulk) || result.Resp3Type == ResultType.Push)
             {
                 var muxer = BridgeCouldBeNull?.Multiplexer;
                 if (muxer == null) return;
@@ -1613,7 +1613,7 @@ namespace StackExchange.Redis
                     parsed = RedisValue.Null;
                     return true;
                 }
-                switch (value.Type)
+                switch (value.Resp2Type)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -1810,7 +1810,7 @@ namespace StackExchange.Redis
         //    }
         //}
 
-        private static RawResult ReadArray(Arena<RawResult> arena, in ReadOnlySequence<byte> buffer, ref BufferReader reader, bool includeDetailInExceptions, ServerEndPoint? server)
+        private static RawResult ReadArray(ResultType resultType, Arena<RawResult> arena, in ReadOnlySequence<byte> buffer, ref BufferReader reader, bool includeDetailInExceptions, ServerEndPoint? server)
         {
             var itemCount = ReadLineTerminatedString(ResultType.Integer, ref reader);
             if (itemCount.HasValue)
@@ -1830,7 +1830,7 @@ namespace StackExchange.Redis
                 }
 
                 var oversized = arena.Allocate(itemCountActual);
-                var result = new RawResult(oversized, false);
+                var result = new RawResult(resultType, oversized);
 
                 if (oversized.IsSingleSegment)
                 {
@@ -1861,7 +1861,7 @@ namespace StackExchange.Redis
             return RawResult.Nil;
         }
 
-        private static RawResult ReadBulkString(ref BufferReader reader, bool includeDetailInExceptions, ServerEndPoint? server)
+        private static RawResult ReadBulkString(ResultType type, ref BufferReader reader, bool includeDetailInExceptions, ServerEndPoint? server)
         {
             var prefix = ReadLineTerminatedString(ResultType.Integer, ref reader);
             if (prefix.HasValue)
@@ -1870,7 +1870,7 @@ namespace StackExchange.Redis
                 int bodySize = checked((int)i64);
                 if (bodySize < 0)
                 {
-                    return new RawResult(ResultType.BulkString, ReadOnlySequence<byte>.Empty, true);
+                    return new RawResult(ResultType.Null, ReadOnlySequence<byte>.Empty);
                 }
 
                 if (reader.TryConsumeAsBuffer(bodySize, out var payload))
@@ -1880,7 +1880,7 @@ namespace StackExchange.Redis
                         case ConsumeResult.NeedMoreData:
                             break; // see NilResult below
                         case ConsumeResult.Success:
-                            return new RawResult(ResultType.BulkString, payload, false);
+                            return new RawResult(type, payload);
                         default:
                             throw ExceptionFactory.ConnectionFailure(includeDetailInExceptions, ConnectionFailureType.ProtocolFailure, "Invalid bulk string terminator", server);
                     }
@@ -1897,7 +1897,7 @@ namespace StackExchange.Redis
             var payload = reader.ConsumeAsBuffer(crlfOffsetFromCurrent);
             reader.Consume(2);
 
-            return new RawResult(type, payload, false);
+            return new RawResult(type, payload);
         }
 
         internal enum ReadStatus
@@ -1949,10 +1949,10 @@ namespace StackExchange.Redis
                     return ReadLineTerminatedString(ResultType.Integer, ref reader);
                 case '$': // bulk string
                     reader.Consume(1);
-                    return ReadBulkString(ref reader, includeDetilInExceptions, server);
+                    return ReadBulkString(ResultType.BulkString, ref reader, includeDetilInExceptions, server);
                 case '*': // array
                     reader.Consume(1);
-                    return ReadArray(arena, in buffer, ref reader, includeDetilInExceptions, server);
+                    return ReadArray(ResultType.MultiBulk, arena, in buffer, ref reader, includeDetilInExceptions, server);
                 default:
                     // string s = Format.GetString(buffer);
                     if (allowInlineProtocol) return ParseInlineProtocol(arena, ReadLineTerminatedString(ResultType.SimpleString, ref reader));
@@ -1971,9 +1971,9 @@ namespace StackExchange.Redis
             var iter = block.GetEnumerator();
             foreach (var token in line.GetInlineTokenizer())
             {   // this assigns *via a reference*, returned via the iterator; just... sweet
-                iter.GetNext() = new RawResult(line.Type, token, false);
+                iter.GetNext() = new RawResult(line.Resp2Type, token); // spoof RESP2 from RESP1
             }
-            return new RawResult(block, false);
+            return new RawResult(ResultType.MultiBulk, block); // spoof RESP2 from RESP1
         }
     }
 }

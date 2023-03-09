@@ -10,6 +10,8 @@ namespace StackExchange.Redis
     /// </summary>
     public abstract class RedisResult
     {
+        internal RedisResult(ResultType resultType) => Resp3Type = resultType;
+
         /// <summary>
         /// Create a new RedisResult representing a single value.
         /// </summary>
@@ -25,7 +27,7 @@ namespace StackExchange.Redis
         /// <returns> new <see cref="RedisResult"/>.</returns>
         public static RedisResult Create(RedisValue[] values) =>
             values == null ? NullArray : values.Length == 0 ? EmptyArray :
-                new ArrayRedisResult(Array.ConvertAll(values, value => new SingleRedisResult(value, null)));
+                new ArrayRedisResult(Array.ConvertAll(values, value => new SingleRedisResult(value, null)), ResultType.MultiBulk);
 
         /// <summary>
         /// Create a new RedisResult representing an array of values.
@@ -33,22 +35,27 @@ namespace StackExchange.Redis
         /// <param name="values">The <see cref="RedisResult"/>s to create a result from.</param>
         /// <returns> new <see cref="RedisResult"/>.</returns>
         public static RedisResult Create(RedisResult[] values)
-            => values == null ? NullArray : values.Length == 0 ? EmptyArray : new ArrayRedisResult(values);
+            => values == null ? NullArray : values.Length == 0 ? EmptyArray : new ArrayRedisResult(values, ResultType.MultiBulk);
 
         /// <summary>
         /// An empty array result.
         /// </summary>
-        internal static RedisResult EmptyArray { get; } = new ArrayRedisResult(Array.Empty<RedisResult>());
+        internal static RedisResult EmptyArray { get; } = new ArrayRedisResult(Array.Empty<RedisResult>(), ResultType.MultiBulk);
 
         /// <summary>
         /// A null array result.
         /// </summary>
-        internal static RedisResult NullArray { get; } = new ArrayRedisResult(null);
+        internal static RedisResult NullArray { get; } = new ArrayRedisResult(null, ResultType.Null);
 
         /// <summary>
         /// A null single result, to use as a default for invalid returns.
         /// </summary>
-        internal static RedisResult NullSingle { get; } = new SingleRedisResult(RedisValue.Null, ResultType.None);
+        internal static RedisResult NullSingle { get; } = new SingleRedisResult(RedisValue.Null, ResultType.Null);
+
+        /// <summary>
+        /// Gets the number of elements in this item if it is a valid array, or <c>-1</c> otherwise.
+        /// </summary>
+        public virtual int Length => -1;
 
         /// <summary>
         /// Internally, this is very similar to RawResult, except it is designed to be usable,
@@ -58,12 +65,12 @@ namespace StackExchange.Redis
         {
             try
             {
-                switch (result.Type)
+                switch (result.Resp2Type)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
                     case ResultType.BulkString:
-                        redisResult = new SingleRedisResult(result.AsRedisValue(), result.Type);
+                        redisResult = new SingleRedisResult(result.AsRedisValue(), result.Resp3Type);
                         return true;
                     case ResultType.MultiBulk:
                         if (result.IsNull)
@@ -91,10 +98,10 @@ namespace StackExchange.Redis
                                 return false;
                             }
                         }
-                        redisResult = new ArrayRedisResult(arr);
+                        redisResult = new ArrayRedisResult(arr, result.Resp3Type);
                         return true;
                     case ResultType.Error:
-                        redisResult = new ErrorRedisResult(result.GetString());
+                        redisResult = new ErrorRedisResult(result.GetString(), result.Resp3Type);
                         return true;
                     default:
                         redisResult = null;
@@ -110,9 +117,22 @@ namespace StackExchange.Redis
         }
 
         /// <summary>
-        /// Indicate the type of result that was received from redis.
+        /// Indicate the type of result that was received from redis, in RESP2 terms.
         /// </summary>
-        public abstract ResultType Type { get; }
+        [Obsolete($"Please use either {nameof(Resp2Type)} (simplified) or {nameof(Resp3Type)} (full)")]
+        public ResultType Type => Resp2Type;
+
+        /// <summary>
+        /// Indicate the type of result that was received from redis, in RESP3 terms.
+        /// </summary>
+        public ResultType Resp3Type { get; }
+
+        /// <summary>
+        /// Indicate the type of result that was received from redis, in RESP2 terms.
+        /// </summary>
+        public ResultType Resp2Type => Resp3Type == ResultType.Null ? Resp2NullType : Resp3Type.ToResp2();
+
+        internal virtual ResultType Resp2NullType => ResultType.BulkString;
 
         /// <summary>
         /// Indicates whether this result was a null result.
@@ -287,16 +307,20 @@ namespace StackExchange.Redis
         internal abstract RedisValue[]? AsRedisValueArray();
         internal abstract string? AsString();
         internal abstract string?[]? AsStringArray();
+
         private sealed class ArrayRedisResult : RedisResult
         {
-            public override bool IsNull => _value == null;
+            public override bool IsNull => _value is null;
             private readonly RedisResult[]? _value;
 
-            public override ResultType Type => ResultType.MultiBulk;
-            public ArrayRedisResult(RedisResult[]? value)
+            internal override ResultType Resp2NullType => ResultType.MultiBulk;
+
+            public ArrayRedisResult(RedisResult[]? value, ResultType resultType) : base(value is null ? ResultType.Null : resultType)
             {
                 _value = value;
             }
+
+            public override int Length => _value is null ? -1 : _value.Length;
 
             public override string ToString() => _value == null ? "(nil)" : (_value.Length + " element(s)");
 
@@ -446,8 +470,7 @@ namespace StackExchange.Redis
         {
             private readonly string value;
 
-            public override ResultType Type => ResultType.Error;
-            public ErrorRedisResult(string? value)
+            public ErrorRedisResult(string? value, ResultType type) : base(type)
             {
                 this.value = value ?? throw new ArgumentNullException(nameof(value));
             }
@@ -483,15 +506,13 @@ namespace StackExchange.Redis
         private sealed class SingleRedisResult : RedisResult, IConvertible
         {
             private readonly RedisValue _value;
-            public override ResultType Type { get; }
 
-            public SingleRedisResult(RedisValue value, ResultType? resultType)
+            public SingleRedisResult(RedisValue value, ResultType? resultType) : base(value.IsNull ? ResultType.Null : resultType ?? (value.IsInteger ? ResultType.Integer : ResultType.BulkString))
             {
                 _value = value;
-                Type = resultType ?? (value.IsInteger ? ResultType.Integer : ResultType.BulkString);
             }
 
-            public override bool IsNull => _value.IsNull;
+            public override bool IsNull => Resp3Type == ResultType.Null || _value.IsNull;
 
             public override string ToString() => _value.ToString();
             internal override bool AsBoolean() => (bool)_value;
@@ -555,7 +576,7 @@ namespace StackExchange.Redis
             decimal IConvertible.ToDecimal(IFormatProvider? provider)
             {
                 // we can do this safely *sometimes*
-                if (Type == ResultType.Integer) return AsInt64();
+                if (Resp2Type == ResultType.Integer) return AsInt64();
                 // but not always
                 ThrowNotSupported();
                 return default;
@@ -578,7 +599,7 @@ namespace StackExchange.Redis
                     case TypeCode.UInt64: checked { return (ulong)AsInt64(); }
                     case TypeCode.Single: return (float)AsDouble();
                     case TypeCode.Double: return AsDouble();
-                    case TypeCode.Decimal when Type == ResultType.Integer: return AsInt64();
+                    case TypeCode.Decimal when Resp2Type == ResultType.Integer: return AsInt64();
                     case TypeCode.String: return AsString()!;
                     default:
                         ThrowNotSupported();

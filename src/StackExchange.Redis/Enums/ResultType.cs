@@ -9,6 +9,9 @@
         /// No value was received.
         /// </summary>
         None = 0,
+
+        // RESP 2
+
         /// <summary>
         /// Basic strings typically represent status results such as "OK".
         /// </summary>
@@ -29,5 +32,64 @@
         /// Multi-bulk replies represent complex results such as arrays.
         /// </summary>
         MultiBulk = 5,
+
+        // RESP3: https://github.com/redis/redis-specifications/blob/master/protocol/RESP3.md
+
+        /// <summary>
+        /// A single null value replacing RESP v2 blob and multi-bulk nulls.
+        /// </summary>
+        Null = 6,
+
+        /// <summary>
+        /// A floating point number.
+        /// </summary>
+        Double = 7,
+
+        /// <summary>
+        /// True or false.
+        /// </summary>
+        Boolean = 8,
+
+        /// <summary>
+        /// Binary safe error code and message.
+        /// </summary>
+        BlobError = 9,
+
+        /// <summary>
+        /// A binary safe string that should be displayed to humans without any escaping or filtering. For instance the output of <c>LATENCY DOCTOR</c> in Redis.
+        /// </summary>
+        VerbatimString = 10,
+
+        /// <summary>
+        /// An unordered collection of key-value pairs. Keys and values can be any other RESP3 type.
+        /// </summary>
+        Map = 11,
+
+        /// <summary>
+        /// An unordered collection of N other types.
+        /// </summary>
+        Set = 12,
+
+        /// <summary>
+        /// Like the <see cref="Map"/> type, but the client should keep reading the reply ignoring the attribute type, and return it to the client as additional information.
+        /// </summary>
+        Attribute = 13,
+
+        /// <summary>
+        /// Out of band data. The format is like the <see cref="MultiBulk"/> type, but the client should just check the first string element, stating the type of the out of band data, a call a callback if there is one registered for this specific type of push information. Push types are not related to replies, since they are information that the server may push at any time in the connection, so the client should keep reading if it is reading the reply of a command.
+        /// </summary>
+        Push = 14,
+
+        /// <summary>
+        /// Like the <see cref="Map"/> type, but is sent only when the connection between the client and the server is established, in order to welcome the client with different information like the name of the server, its version, and so forth.
+        /// </summary>
+        Hello = 15,
+
+        /// <summary>
+        /// A large number non representable by the <see cref="Integer"/> type
+        /// </summary>
+        BigInteger = 16,
+
+        // WARNING: 128+ (high bit) used for null mask; DO NOT USE
     }
 }
