@@ -13,8 +13,7 @@ namespace StackExchange.Redis
         internal int ItemsCount => (int)_items.Length;
         internal ReadOnlySequence<byte> Payload { get; }
 
-        internal static readonly RawResult NullMultiBulk = new RawResult(ResultType.Null, default(Sequence<RawResult>));
-        internal static readonly RawResult EmptyMultiBulk = new RawResult(ResultType.Null, default(Sequence<RawResult>));
+        internal static readonly RawResult NullArray = new RawResult(ResultType.Null, items: default);
         internal static readonly RawResult Nil = default;
         // Note: can't use Memory<RawResult> here - struct recursion breaks runtime
         private readonly Sequence _items;

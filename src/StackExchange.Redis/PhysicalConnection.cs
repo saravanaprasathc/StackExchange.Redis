@@ -1821,12 +1821,12 @@ namespace StackExchange.Redis
                 if (itemCountActual < 0)
                 {
                     //for null response by command like EXEC, RESP array: *-1\r\n
-                    return RawResult.NullMultiBulk;
+                    return RawResult.NullArray;
                 }
                 else if (itemCountActual == 0)
                 {
                     //for zero array response by command like SCAN, Resp array: *0\r\n 
-                    return RawResult.EmptyMultiBulk;
+                    return new RawResult(resultType, items: default);
                 }
 
                 var oversized = arena.Allocate(itemCountActual);
