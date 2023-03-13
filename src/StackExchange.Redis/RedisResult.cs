@@ -283,6 +283,11 @@ namespace StackExchange.Redis
             return result;
         }
 
+        /// <summary>
+        /// Get a sub-item by index
+        /// </summary>
+        public virtual RedisResult this[int index] => throw new InvalidOperationException("Indexers can only be used on array results");
+
         internal abstract bool AsBoolean();
         internal abstract bool[]? AsBooleanArray();
         internal abstract byte[]? AsByteArray();
@@ -329,6 +334,8 @@ namespace StackExchange.Redis
                 if (IsSingleton) return _value![0].AsBoolean();
                 throw new InvalidCastException();
             }
+
+            public override RedisResult this[int index] => _value![index];
 
             internal override bool[]? AsBooleanArray() => IsNull ? null : Array.ConvertAll(_value!, x => x.AsBoolean());
 

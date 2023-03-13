@@ -52,19 +52,19 @@ namespace StackExchange.Redis
         Null = (1 << 3) | None,
 
         /// <summary>
+        /// True or false.
+        /// </summary>
+        Boolean = (1 << 3) | Integer,
+
+        /// <summary>
         /// A floating point number.
         /// </summary>
         Double = (1 << 3) | SimpleString,
 
         /// <summary>
-        /// True or false.
-        /// </summary>
-        Boolean = (2 << 3) | SimpleString,
-
-        /// <summary>
         /// A large number non representable by the <see cref="Integer"/> type
         /// </summary>
-        BigInteger = (3 << 3) | SimpleString,
+        BigInteger = (2 << 3) | SimpleString,
 
         /// <summary>
         /// Binary safe error code and message.

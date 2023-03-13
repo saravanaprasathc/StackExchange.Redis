@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
@@ -72,4 +73,74 @@ public sealed class Resp3Tests : TestBase
         Assert.Equal(resp3, server.IsResp3);
         Assert.NotNull(server.GetBridge(RedisCommand.GET)?.ClientId);
     }
+
+    [Theory]
+    [InlineData("return 42", false, ResultType.Integer, ResultType.Integer, 42)]
+    [InlineData("return 'abc'", false, ResultType.BulkString, ResultType.BulkString, "abc")]
+    [InlineData(@"return {1,2,3}", false, ResultType.Array, ResultType.Array, ARR_123)]
+    [InlineData("return nil", false, ResultType.BulkString, ResultType.Null, null)]
+    [InlineData(@"return redis.pcall('hgetall', 'key')", false, ResultType.Array, ResultType.Array, MAP_ABC)]
+    [InlineData("return true", false, ResultType.Integer, ResultType.Integer, 1)]
+
+    [InlineData("return 42", true, ResultType.Integer, ResultType.Integer, 42)]
+    [InlineData("return 'abc'", true, ResultType.BulkString, ResultType.BulkString, "abc")]
+    [InlineData("return {1,2,3}", true, ResultType.Array, ResultType.Array, ARR_123)]
+    [InlineData("return nil", true, ResultType.BulkString, ResultType.Null, null)]
+    [InlineData(@"return redis.pcall('hgetall', 'key')", true, ResultType.Array, ResultType.Array, MAP_ABC)]
+    [InlineData("return true", true, ResultType.Integer, ResultType.Integer, 1)]
+    public async Task CheckLuaRespult(string script, bool useResp3, ResultType resp2, ResultType resp3, object expected)
+    {
+        // note Lua does not appear to return RESP3 types in any scenarios
+
+        using var muxer = Create(protocol: useResp3 ? "resp3" : "resp2", require: RedisFeatures.v6_0_0);
+        Assert.Equal(useResp3, muxer.GetServerEndPoint(muxer.GetEndPoints().Single()).IsResp3);
+
+        var db = muxer.GetDatabase();
+        if (expected is MAP_ABC)
+        {
+            db.KeyDelete("key");
+            db.HashSet("key", "a", 1);
+            db.HashSet("key", "b", 2);
+            db.HashSet("key", "c", 3);
+        }
+        var result = await db.ScriptEvaluateAsync(script, flags: CommandFlags.NoScriptCache);
+        Assert.Equal(resp2, result.Resp2Type);
+        Assert.Equal(resp3, result.Resp3Type);
+
+        switch (expected)
+        {
+            case null:
+                Assert.True(result.IsNull);
+                break;
+            case ARR_123:
+                Assert.Equal(3, result.Length);
+                for (int i = 0; i < result.Length; i++)
+                {
+                    Assert.Equal(i + 1, result[i].AsInt32());
+                }
+                break;
+            case MAP_ABC:
+                var map = result.ToDictionary();
+                Assert.Equal(3, map.Count);
+                Assert.True(map.TryGetValue("a", out var value));
+                Assert.Equal(1, value.AsInt32());
+                Assert.True(map.TryGetValue("b", out value));
+                Assert.Equal(2, value.AsInt32());
+                Assert.True(map.TryGetValue("c", out value));
+                Assert.Equal(3, value.AsInt32());
+                break;
+            case string s:
+                Assert.Equal(s, result.AsString());
+                break;
+            case int i:
+                Assert.Equal(i, result.AsInt32());
+                break;
+            case bool b:
+                Assert.Equal(b, result.AsBoolean());
+                break;
+        }
+    }
+
+    private const string ARR_123 = nameof(ARR_123);
+    private const string MAP_ABC = nameof(MAP_ABC);
 }
