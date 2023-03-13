@@ -1,4 +1,9 @@
-﻿using Xunit;
+﻿using StackExchange.Redis.Tests.Helpers;
+using System.ComponentModel.Design;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace StackExchange.Redis.Tests;
@@ -55,5 +60,18 @@ public sealed class Resp3Tests : TestBase
         Assert.Equal(configurationString, config.ToString(true)); // check round-trip
         Assert.Equal(configurationString, config.Clone().ToString(true)); // check clone
         Assert.Equal(tryResp3, config.TryResp3());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TryConnect(bool resp3)
+    {
+        var options = ConfigurationOptions.Parse(GetConfiguration());
+        options.Protocol = resp3 ? "resp3" : "resp2";
+        using var muxer = await ConnectionMultiplexer.ConnectAsync(options, Writer);
+        await muxer.GetDatabase().PingAsync();
+
+        Assert.Equal(resp3, muxer.GetServerEndPoint(muxer.GetEndPoints().Single()).IsResp3);
     }
 }

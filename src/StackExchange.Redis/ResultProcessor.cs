@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Pipelines.Sockets.Unofficial.Arenas;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,7 +9,6 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
-using Pipelines.Sockets.Unofficial.Arenas;
 
 namespace StackExchange.Redis
 {
@@ -771,17 +771,10 @@ namespace StackExchange.Redis
                                     if ((val = Extract(line, "role:")) != null)
                                     {
                                         roleSeen = true;
-                                        switch (val)
+                                        if (TryParseRole(val, out bool isReplica))
                                         {
-                                            case "master":
-                                                server.IsReplica = false;
-                                                Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (INFO) role: primary");
-                                                break;
-                                            case "replica":
-                                            case "slave":
-                                                server.IsReplica = true;
-                                                Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (INFO) role: replica");
-                                                break;
+                                            server.IsReplica = isReplica;
+                                            Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (INFO) role: {(isReplica ? "replica" : "primary")}");
                                         }
                                     }
                                     else if ((val = Extract(line, "master_host:")) != null)
@@ -794,7 +787,7 @@ namespace StackExchange.Redis
                                     }
                                     else if ((val = Extract(line, "redis_version:")) != null)
                                     {
-                                        if (Version.TryParse(val, out Version? version))
+                                        if (Format.TryParseVersion(val, out Version? version))
                                         {
                                             server.Version = version;
                                             Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (INFO) version: " + version);
@@ -802,20 +795,10 @@ namespace StackExchange.Redis
                                     }
                                     else if ((val = Extract(line, "redis_mode:")) != null)
                                     {
-                                        switch (val)
+                                        if (TryParseServerType(val, out var serverType))
                                         {
-                                            case "standalone":
-                                                server.ServerType = ServerType.Standalone;
-                                                Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (INFO) server-type: standalone");
-                                                break;
-                                            case "cluster":
-                                                server.ServerType = ServerType.Cluster;
-                                                Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (INFO) server-type: cluster");
-                                                break;
-                                            case "sentinel":
-                                                server.ServerType = ServerType.Sentinel;
-                                                Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (INFO) server-type: sentinel");
-                                                break;
+                                            server.ServerType = serverType;
+                                            Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (INFO) server-type: {serverType}");
                                         }
                                     }
                                     else if ((val = Extract(line, "run_id:")) != null)
@@ -886,6 +869,54 @@ namespace StackExchange.Redis
                                 }
                             }
                         }
+                        else if (message?.Command == RedisCommand.HELLO)
+                        {
+                            // the result is a non-homogeneous shape; we only do this for the handshake - use ScriptResult
+                            if (!RedisResult.TryCreate(connection, in result, out var handshake) || handshake.IsNull || handshake.Length < 0)
+                            {
+                                Log?.WriteLine($"{Format.ToString(server)}: Response from HELLO is unexpected");
+                            }
+                            else
+                            {
+                                Log?.WriteLine($"{Format.ToString(server)}: Processing HELLO response ({handshake.Length} entries)");
+                                var tokens = handshake.ToDictionary(StringComparer.OrdinalIgnoreCase);
+                                if (tokens.TryGetValue("version", out var value) && value.Length < 0)
+                                {
+                                    var typed = value.AsRedisValue().TryGetVersion();
+                                    if (typed is not null)
+                                    {
+                                        server.Version = typed;
+                                        Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) server-version: {typed}");
+                                    }
+                                }
+                                if (tokens.TryGetValue("proto", out value) && value.Length < 0)
+                                {
+                                    int protocolVersion = value.AsInt32();
+                                    server.IsResp3 = protocolVersion >= 2;
+                                    Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) protocol: {protocolVersion}");
+                                }
+                                if (tokens.TryGetValue("id", out value) && value.Length < 0)
+                                {
+                                    connection.ClientId = value.AsInt64();
+                                }
+                                if (tokens.TryGetValue("mode", out value) && value.Length < 0)
+                                {
+                                    if (TryParseServerType(value.AsString(), out var serverType))
+                                    {
+                                        server.ServerType = serverType;
+                                        Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) server-type: {serverType}");
+                                    }
+                                }
+                                if (tokens.TryGetValue("role", out value) && value.Length < 0)
+                                {
+                                    if (TryParseRole(value.AsString(), out bool isReplica))
+                                    {
+                                        server.IsReplica = isReplica;
+                                        Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) role: {(isReplica ? "replica" : "primary")}");
+                                    }
+                                }
+                            }
+                        }
                         else if (message?.Command == RedisCommand.SENTINEL)
                         {
                             server.ServerType = ServerType.Sentinel;
@@ -902,6 +933,45 @@ namespace StackExchange.Redis
                 if (line.StartsWith(prefix)) return line.Substring(prefix.Length).Trim();
                 return null;
             }
+
+            private static bool TryParseServerType(string? val, out ServerType serverType)
+            {
+                switch (val)
+                {
+                    case "standalone":
+                        serverType = ServerType.Standalone;
+                        return true;
+                    case "cluster":
+                        serverType = ServerType.Cluster;
+                        return true;
+                    case "sentinel":
+                        serverType = ServerType.Sentinel;
+                        return true;
+                    default:
+                        serverType = default;
+                        return false;
+                }
+            }
+
+            private static bool TryParseRole(string? val, out bool isReplica)
+            {
+                switch (val)
+                {
+                    case "primary":
+                    case "master":
+                        isReplica = false;
+                        return true;
+                    case "replica":
+                    case "slave":
+                        isReplica = true;
+                        return true;
+                    default:
+                        isReplica = default;
+                        return false;
+                }
+            }
+
+            internal static ResultProcessor<bool> Create(LogProxy? log) => log is null ? AutoConfigure : new AutoConfigureProcessor(log);
         }
 
         private sealed class BooleanProcessor : ResultProcessor<bool>

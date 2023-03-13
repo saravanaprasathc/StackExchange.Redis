@@ -256,6 +256,7 @@ namespace StackExchange.Redis
         public long SubscriptionCount { get; set; }
 
         public bool TransactionActive { get; internal set; }
+        internal long? ClientId { get; set; }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2202:Do not dispose objects multiple times")]
         internal void Shutdown()
@@ -1828,6 +1829,8 @@ namespace StackExchange.Redis
                     //for zero array response by command like SCAN, Resp array: *0\r\n 
                     return new RawResult(resultType, items: default);
                 }
+
+                if (resultType == ResultType.Map) itemCountActual <<= 1; // if it says "3", it means 3 pairs, i.e. 6 values
 
                 var oversized = arena.Allocate(itemCountActual);
                 var result = new RawResult(resultType, oversized);

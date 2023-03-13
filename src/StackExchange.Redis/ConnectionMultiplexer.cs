@@ -132,7 +132,7 @@ namespace StackExchange.Redis
             EndPoints.SetDefaultPorts(serverType, ssl: RawConfig.Ssl);
 
             var map = CommandMap = configuration.GetCommandMap(serverType);
-            if (!string.IsNullOrWhiteSpace(configuration.Password))
+            if (!string.IsNullOrWhiteSpace(configuration.Password) && !configuration.TryResp3()) // RESP3 doesn't need AUTH
             {
                 map.AssertAvailable(RedisCommand.AUTH);
             }
@@ -899,7 +899,7 @@ namespace StackExchange.Redis
                 if (isNew && activate)
                 {
                     server.Activate(ConnectionType.Interactive, log);
-                    if (server.SupportsSubscriptions)
+                    if (server.SupportsSubscriptions && !RawConfig.TryResp3())
                     {
                         // Intentionally not logging the sub connection
                         server.Activate(ConnectionType.Subscription, null);
@@ -1250,10 +1250,11 @@ namespace StackExchange.Redis
 
         private void ActivateAllServers(LogProxy? log)
         {
+            bool tryResp3 = RawConfig.TryResp3();
             foreach (var server in GetServerSnapshot())
             {
                 server.Activate(ConnectionType.Interactive, log);
-                if (server.SupportsSubscriptions)
+                if (server.SupportsSubscriptions && !tryResp3)
                 {
                     // Intentionally not logging the sub connection
                     server.Activate(ConnectionType.Subscription, null);

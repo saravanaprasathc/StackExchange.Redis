@@ -47,14 +47,9 @@ namespace StackExchange.Redis
 
             internal static Version ParseVersion(string key, string value)
             {
-                if (System.Version.TryParse(value, out Version? tmp))
+                if (Format.TryParseVersion(value, out Version? tmp))
                 {
                     return tmp;
-                }
-                // allow major-only (Version doesn't do this, because... reasons?)
-                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int major))
-                {
-                    return new Version(major, 0);
                 }
                 throw new ArgumentOutOfRangeException(key, $"Keyword '{key}' requires a version value; the value '{value}' is not recognised.");
             }
