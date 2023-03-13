@@ -1,7 +1,4 @@
-﻿using StackExchange.Redis.Tests.Helpers;
-using System.ComponentModel.Design;
-using System.IO;
-using System.Linq;
+﻿using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
