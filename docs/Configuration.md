@@ -279,8 +279,8 @@ unless it has reason to expect it to work:
 This can be considered, in order:
 
 - the `HELLO` command has been disabled: RESP2 is used
-- a protocol of `resp3` or `3` is specified: RESP3 is attempted (with fallback if it fails)
 - a protocol *other than* `resp3` or `3` is specified: RESP2 is used
-- a version of at least 6 is specified: RESP3 is assumed (with fallback if it fails)
+- a protocol of `resp3` or `3` is specified: RESP3 is attempted (with fallback if it fails)
+- a version of at least 6 is specified: RESP3 is attempted (with fallback if it fails)
 - in all other scenarios: RESP2 is used
 
