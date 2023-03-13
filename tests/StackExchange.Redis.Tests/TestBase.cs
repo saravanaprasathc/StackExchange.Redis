@@ -263,6 +263,7 @@ public abstract class TestBase : IDisposable
         int? defaultDatabase = null,
         BacklogPolicy? backlogPolicy = null,
         Version? require = null,
+        string? protocol = null,
         [CallerMemberName] string? caller = null)
     {
         if (Output == null)
@@ -284,7 +285,8 @@ public abstract class TestBase : IDisposable
             && defaultDatabase == null
             && (allowAdmin == null || allowAdmin == true)
             && expectedFailCount == 0
-            && backlogPolicy == null)
+            && backlogPolicy == null
+            && protocol is null)
         {
             configuration = GetConfiguration();
             // Only return if we match
@@ -304,7 +306,7 @@ public abstract class TestBase : IDisposable
             checkConnect, failMessage,
             channelPrefix, proxy,
             logTransactionData, defaultDatabase,
-            backlogPolicy,
+            backlogPolicy, protocol,
             caller);
 
         ThrowIfBelowMinVersion(conn, require);
@@ -353,6 +355,7 @@ public abstract class TestBase : IDisposable
         bool logTransactionData = true,
         int? defaultDatabase = null,
         BacklogPolicy? backlogPolicy = null,
+        string? protocol = null,
         [CallerMemberName] string? caller = null)
     {
         StringWriter? localLog = null;
@@ -389,6 +392,7 @@ public abstract class TestBase : IDisposable
             if (proxy != null) config.Proxy = proxy.Value;
             if (defaultDatabase != null) config.DefaultDatabase = defaultDatabase.Value;
             if (backlogPolicy != null) config.BacklogPolicy = backlogPolicy;
+            if (protocol is not null) config.Protocol = protocol;
             var watch = Stopwatch.StartNew();
             var task = ConnectionMultiplexer.ConnectAsync(config, log);
             if (!task.Wait(config.ConnectTimeout >= (int.MaxValue / 2) ? int.MaxValue : config.ConnectTimeout * 2))

@@ -50,6 +50,8 @@ public class SharedConnectionFixture : IDisposable
             set => _inner.IgnoreConnect = value;
         }
 
+        public ServerEndPoint GetServerEndPoint(EndPoint endpoint) => _inner.GetServerEndPoint(endpoint);
+
         public ReadOnlySpan<ServerEndPoint> GetServerSnapshot() => _inner.GetServerSnapshot();
 
         private readonly IInternalConnectionMultiplexer _inner;

@@ -745,8 +745,19 @@ namespace StackExchange.Redis
             {
                 var server = connection.BridgeCouldBeNull?.ServerEndPoint;
                 if (server == null) return false;
+
                 switch (result.Resp2Type)
                 {
+                    case ResultType.Integer:
+                        if (message?.Command == RedisCommand.CLIENT)
+                        {
+                            if (result.TryGetInt64(out long clientId))
+                            {
+                                connection.ClientId = clientId;
+                                Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (CLIENT) connection-id: {clientId}");
+                            }
+                        }
+                        break;
                     case ResultType.BulkString:
                         if (message?.Command == RedisCommand.INFO)
                         {
@@ -898,6 +909,7 @@ namespace StackExchange.Redis
                                 if (tokens.TryGetValue("id", out value) && value.Length < 0)
                                 {
                                     connection.ClientId = value.AsInt64();
+                                    Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) connection-id: {connection.ClientId}");
                                 }
                                 if (tokens.TryGetValue("mode", out value) && value.Length < 0)
                                 {

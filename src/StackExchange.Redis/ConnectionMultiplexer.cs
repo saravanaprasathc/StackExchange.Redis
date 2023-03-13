@@ -874,6 +874,8 @@ namespace StackExchange.Redis
             }
         }
 
+        ServerEndPoint IInternalConnectionMultiplexer.GetServerEndPoint(EndPoint endpoint) => GetServerEndPoint(endpoint);
+
         [return: NotNullIfNotNull("endpoint")]
         internal ServerEndPoint? GetServerEndPoint(EndPoint? endpoint, LogProxy? log = null, bool activate = true)
         {

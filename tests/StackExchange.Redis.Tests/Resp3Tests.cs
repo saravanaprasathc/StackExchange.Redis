@@ -67,11 +67,12 @@ public sealed class Resp3Tests : TestBase
     [InlineData(false)]
     public async Task TryConnect(bool resp3)
     {
-        var options = ConfigurationOptions.Parse(GetConfiguration());
-        options.Protocol = resp3 ? "resp3" : "resp2";
-        using var muxer = await ConnectionMultiplexer.ConnectAsync(options, Writer);
+
+        using var muxer = Create(protocol: resp3 ? "resp3" : "resp2", require: RedisFeatures.v6_0_0);
         await muxer.GetDatabase().PingAsync();
 
-        Assert.Equal(resp3, muxer.GetServerEndPoint(muxer.GetEndPoints().Single()).IsResp3);
+        var server = muxer.GetServerEndPoint(muxer.GetEndPoints().Single());
+        Assert.Equal(resp3, server.IsResp3);
+        Assert.NotNull(server.GetBridge(RedisCommand.GET)?.ClientId);
     }
 }

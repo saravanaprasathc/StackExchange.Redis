@@ -15,6 +15,7 @@ namespace StackExchange.Redis
         bool IgnoreConnect { get; set; }
 
         ReadOnlySpan<ServerEndPoint> GetServerSnapshot();
+        ServerEndPoint GetServerEndPoint(EndPoint endpoint);
 
         ConfigurationOptions RawConfig { get; }
     }

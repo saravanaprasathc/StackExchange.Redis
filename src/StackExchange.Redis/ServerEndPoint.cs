@@ -226,7 +226,7 @@ namespace StackExchange.Redis
             if (isDisposed) return null;
             return type switch
             {
-                ConnectionType.Interactive => interactive ?? (create ? interactive = CreateBridge(ConnectionType.Interactive, log) : null),
+                ConnectionType.Interactive /* or _ when IsResp3 */ => interactive ?? (create ? interactive = CreateBridge(ConnectionType.Interactive, log) : null),
                 ConnectionType.Subscription => subscription ?? (create ? subscription = CreateBridge(ConnectionType.Subscription, log) : null),
                 _ => null,
             };
@@ -239,6 +239,7 @@ namespace StackExchange.Redis
             // Subscription commands go to a specific bridge - so we need to set that up.
             // There are other commands we need to send to the right connection (e.g. subscriber PING with an explicit SetForSubscriptionBridge call),
             // but these always go subscriber.
+
             switch (message.Command)
             {
                 case RedisCommand.SUBSCRIBE:
@@ -249,7 +250,7 @@ namespace StackExchange.Redis
                     break;
             }
 
-            return message.IsForSubscriptionBridge
+            return (message.IsForSubscriptionBridge /* && !IsResp3 */)
                 ? subscription ??= CreateBridge(ConnectionType.Subscription, null)
                 : interactive ??= CreateBridge(ConnectionType.Interactive, null);
         }
@@ -257,16 +258,18 @@ namespace StackExchange.Redis
         public PhysicalBridge? GetBridge(RedisCommand command, bool create = true)
         {
             if (isDisposed) return null;
-            switch (command)
+            //if (!IsResp3)
             {
-                case RedisCommand.SUBSCRIBE:
-                case RedisCommand.UNSUBSCRIBE:
-                case RedisCommand.PSUBSCRIBE:
-                case RedisCommand.PUNSUBSCRIBE:
-                    return subscription ?? (create ? subscription = CreateBridge(ConnectionType.Subscription, null) : null);
-                default:
-                    return interactive ?? (create ? interactive = CreateBridge(ConnectionType.Interactive, null) : null);
+                switch (command)
+                {
+                    case RedisCommand.SUBSCRIBE:
+                    case RedisCommand.UNSUBSCRIBE:
+                    case RedisCommand.PSUBSCRIBE:
+                    case RedisCommand.PUNSUBSCRIBE:
+                        return subscription ?? (create ? subscription = CreateBridge(ConnectionType.Subscription, null) : null);
+                }
             }
+            return interactive ?? (create ? interactive = CreateBridge(ConnectionType.Interactive, null) : null);
         }
 
         public RedisFeatures GetFeatures() => new RedisFeatures(version);
@@ -905,15 +908,27 @@ namespace StackExchange.Redis
             string password = Multiplexer.RawConfig.Password ?? "";
             bool helloSuccess = false;
 
-            if (Multiplexer.RawConfig.TryResp3())
+            var bridge = connection.BridgeCouldBeNull;
+
+            string name = Multiplexer.ClientName;
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                name = nameSanitizer.Replace(name, "");
+            }
+
+            ResultProcessor<bool>? autoConfig = null;
+
+            if (Multiplexer.RawConfig.TryResp3() && bridge is not null)
             {
                 log?.WriteLine($"{Format.ToString(this)}: Authenticating via HELLO");
-                var hello = Message.CreateHello(3, user, password, Multiplexer.ClientName, CommandFlags.None);
+                var hello = Message.CreateHello(3, user, password, name, CommandFlags.None);
+                hello.SetInternalCall();
                 try
                 {
-                    await WriteDirectOrQueueFireAndForgetAsync(connection, hello, ResultProcessor.AutoConfigureProcessor.Create(log)).ForAwait();
-                    //...
-                    helloSuccess = true; //TODO: how to detect failure?
+                    // helloSuccess = await WriteDirectAsync(hello, autoConfig ??= ResultProcessor.AutoConfigureProcessor.Create(log), bridge).ForAwait();
+                    // TODO: how to delay?
+
+                    await WriteDirectOrQueueFireAndForgetAsync(connection, hello, autoConfig ??= ResultProcessor.AutoConfigureProcessor.Create(log)).ForAwait();
                     // TODO: detect -WRONGPASS and react?
                 }
                 catch (Exception ex)
@@ -941,22 +956,20 @@ namespace StackExchange.Redis
 
                 if (Multiplexer.CommandMap.IsAvailable(RedisCommand.CLIENT))
                 {
-                    string name = Multiplexer.ClientName;
                     if (!string.IsNullOrWhiteSpace(name))
                     {
-                        name = nameSanitizer.Replace(name, "");
-                        if (!string.IsNullOrWhiteSpace(name))
-                        {
-                            log?.WriteLine($"{Format.ToString(this)}: Setting client name: {name}");
-                            msg = Message.Create(-1, CommandFlags.FireAndForget, RedisCommand.CLIENT, RedisLiterals.SETNAME, (RedisValue)name);
-                            msg.SetInternalCall();
-                            await WriteDirectOrQueueFireAndForgetAsync(connection, msg, ResultProcessor.DemandOK).ForAwait();
-                        }
+                        log?.WriteLine($"{Format.ToString(this)}: Setting client name: {name}");
+                        msg = Message.Create(-1, CommandFlags.FireAndForget, RedisCommand.CLIENT, RedisLiterals.SETNAME, (RedisValue)name);
+                        msg.SetInternalCall();
+                        await WriteDirectOrQueueFireAndForgetAsync(connection, msg, ResultProcessor.DemandOK).ForAwait();
                     }
+
+                    msg = Message.Create(-1, default, RedisCommand.CLIENT, RedisLiterals.ID);
+                    msg.SetInternalCall();
+                    await WriteDirectOrQueueFireAndForgetAsync(connection, msg, autoConfig ??= ResultProcessor.AutoConfigureProcessor.Create(log)).ForAwait();
                 }
             }
 
-            var bridge = connection.BridgeCouldBeNull;
             if (bridge is null)
             {
                 return;
