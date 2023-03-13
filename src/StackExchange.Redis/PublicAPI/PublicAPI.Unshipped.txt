@@ -1,4 +1,8 @@
 ﻿override StackExchange.Redis.Role.Master.Replica.ToString() -> string!
+StackExchange.Redis.ConfigurationOptions.Protocol.get -> string?
+StackExchange.Redis.ConfigurationOptions.Protocol.set -> void
+StackExchange.Redis.RedisFeatures.Equals(StackExchange.Redis.RedisFeatures other) -> bool
+StackExchange.Redis.RedisFeatures.Resp3.get -> bool
 StackExchange.Redis.RedisResult.Resp2Type.get -> StackExchange.Redis.ResultType
 StackExchange.Redis.RedisResult.Resp3Type.get -> StackExchange.Redis.ResultType
 StackExchange.Redis.RedisResult.Type.get -> StackExchange.Redis.ResultType

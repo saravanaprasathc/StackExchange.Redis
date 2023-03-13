@@ -78,8 +78,7 @@ namespace StackExchange.Redis
 
         public bool IsError => Resp3Type.IsError();
 
-        public ResultType Resp3Type => _resp3type == 0 ? ResultType.None
-            : (IsNull ? ResultType.Null : (_resp3type & ~NonNullFlag));
+        public ResultType Resp3Type => IsNull ? ResultType.Null : (_resp3type & ~NonNullFlag);
 
         public ResultType Resp2Type => _resp3type.ToResp2(); // note null already handled
 

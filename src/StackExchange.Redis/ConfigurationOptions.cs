@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Security;
@@ -46,8 +47,16 @@ namespace StackExchange.Redis
 
             internal static Version ParseVersion(string key, string value)
             {
-                if (!System.Version.TryParse(value, out Version? tmp)) throw new ArgumentOutOfRangeException(key, $"Keyword '{key}' requires a version value; the value '{value}' is not recognised.");
-                return tmp;
+                if (System.Version.TryParse(value, out Version? tmp))
+                {
+                    return tmp;
+                }
+                // allow major-only (Version doesn't do this, because... reasons?)
+                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int major))
+                {
+                    return new Version(major, 0);
+                }
+                throw new ArgumentOutOfRangeException(key, $"Keyword '{key}' requires a version value; the value '{value}' is not recognised.");
             }
 
             internal static Proxy ParseProxy(string key, string value)
@@ -97,7 +106,8 @@ namespace StackExchange.Redis
                 Version = "version",
                 WriteBuffer = "writeBuffer",
                 CheckCertificateRevocation = "checkCertificateRevocation",
-                Tunnel = "tunnel";
+                Tunnel = "tunnel",
+                Protocol = "protocol";
 
             private static readonly Dictionary<string, string> normalizedOptions = new[]
             {
@@ -126,7 +136,8 @@ namespace StackExchange.Redis
                 TieBreaker,
                 Version,
                 WriteBuffer,
-                CheckCertificateRevocation
+                CheckCertificateRevocation,
+                Protocol,
             }.ToDictionary(x => x, StringComparer.OrdinalIgnoreCase);
 
             public static string TryNormalize(string value)
@@ -731,6 +742,7 @@ namespace StackExchange.Redis
             Append(sb, OptionKeys.ConfigCheckSeconds, configCheckSeconds);
             Append(sb, OptionKeys.ResponseTimeout, responseTimeout);
             Append(sb, OptionKeys.DefaultDatabase, DefaultDatabase);
+            Append(sb, OptionKeys.Protocol, Protocol);
             if (Tunnel is { IsInbuilt: true } tunnel)
             {
                 Append(sb, OptionKeys.Tunnel, tunnel.ToString());
@@ -902,6 +914,10 @@ namespace StackExchange.Redis
                                 throw new ArgumentException("Tunnel cannot be parsed: " + value);
                             }
                             break;
+                        case OptionKeys.Protocol:
+                            // we won't attempt to over-specify here, to allow flexibility
+                            Protocol = value.IsNullOrWhiteSpace() ? null : value.Trim();
+                            break;
                         // Deprecated options we ignore...
                         case OptionKeys.HighPrioritySocketThreads:
                         case OptionKeys.PreserveAsyncOrder:
@@ -944,5 +960,28 @@ namespace StackExchange.Redis
         /// Allows custom transport implementations, such as http-tunneling via a proxy.
         /// </summary>
         public Tunnel? Tunnel { get; set; }
+
+        /// <summary>
+        /// Specify the redis protocol type; for example, "resp3"
+        /// </summary>
+        public string? Protocol { get; set; }
+
+
+        internal bool TryResp3()
+        {
+            if (string.IsNullOrWhiteSpace(Protocol))
+            {
+                // if not specified, lean on the server version and whether HELLO is available
+                if (new RedisFeatures(DefaultVersion).Resp3 && CommandMap.IsAvailable(RedisCommand.HELLO))
+                {
+                    return true;
+                }
+            }
+            // if specified, recognize some specific tokens; we'll worry about hypothetical 3.1 and resp4 when it happens;
+            // in particular, I *don't* want to restrict this to just semver
+            return (string.Equals(Protocol, "3") || string.Equals(Protocol, "resp3", StringComparison.OrdinalIgnoreCase))
+                && CommandMap.IsAvailable(RedisCommand.HELLO);
+
+        }
     }
 }

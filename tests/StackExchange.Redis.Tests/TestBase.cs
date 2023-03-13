@@ -323,7 +323,7 @@ public abstract class TestBase : IDisposable
         }
 
         var serverVersion = conn.GetServer(conn.GetEndPoints()[0]).Version;
-        if (requiredVersion > serverVersion)
+        if (!serverVersion.IsAtLeast(requiredVersion))
         {
             throw new SkipTestException($"Requires server version {requiredVersion}, but server is only {serverVersion}.")
             {

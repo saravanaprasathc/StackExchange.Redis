@@ -694,7 +694,7 @@ namespace StackExchange.Redis
             lastInfoReplicationCheckTicks = Environment.TickCount;
             ResetExponentiallyReplicationCheck();
 
-            if (version >= RedisFeatures.v2_8_0 && Multiplexer.CommandMap.IsAvailable(RedisCommand.INFO)
+            if (version.IsAtLeast(RedisFeatures.v2_8_0) && Multiplexer.CommandMap.IsAvailable(RedisCommand.INFO)
                 && GetBridge(ConnectionType.Interactive, false) is PhysicalBridge bridge)
             {
                 var msg = Message.Create(-1, CommandFlags.FireAndForget | CommandFlags.NoRedirect, RedisCommand.INFO, RedisLiterals.replication);

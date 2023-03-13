@@ -64,6 +64,7 @@ internal enum RedisCommand
     GETSET,
 
     HDEL,
+    HELLO,
     HEXISTS,
     HGET,
     HGETALL,
