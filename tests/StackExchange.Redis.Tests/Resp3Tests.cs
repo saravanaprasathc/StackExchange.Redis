@@ -53,6 +53,7 @@ public sealed class Resp3Tests : TestBase
     {
         var config = ConfigurationOptions.Parse(configurationString);
         Assert.Equal(configurationString, config.ToString(true)); // check round-trip
+        Assert.Equal(configurationString, config.Clone().ToString(true)); // check clone
         Assert.Equal(tryResp3, config.TryResp3());
     }
 }

@@ -663,6 +663,7 @@ namespace StackExchange.Redis
             SslClientAuthenticationOptions = SslClientAuthenticationOptions,
 #endif
             Tunnel = Tunnel,
+            Protocol = Protocol,
         };
 
         /// <summary>
