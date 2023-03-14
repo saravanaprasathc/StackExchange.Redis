@@ -911,11 +911,41 @@ namespace StackExchange.Redis
 
             IsResp3 = false; // assume we don't succeed with RESP3; will be updated in the HELLO processor
 
+            string clientName = Multiplexer.ClientName;
+            if (!string.IsNullOrWhiteSpace(clientName))
+            {
+                clientName = nameSanitizer.Replace(clientName, "");
+            }
+
+            // NOTE:
+            // we might send the auth and client-name *twice* in RESP3 mode; this is intentional:
+            // - we don't know for sure which commands are available; HELLO is not always available,
+            //   even on v6 servers, and we don't usually even know the server version yet; likewise,
+            //   CLIENT could be disabled/renamed
+            // - on an authenticated server, you MUST issue HELLO with AUTH, so we can't avoid it there
+            // - but if the HELLO with AUTH isn't recognized, we might still need to auth; the following is
+            //   legal in all scenarios, and results in a consistent state:
+            //
+            //   (auth enabled)
+            //
+            //   HELLO 3 AUTH {user} {password} SETNAME {client}
+            //   AUTH {user} {password}
+            //   CLIENT SETNAME {client}
+            //
+            //   (auth disabled)
+            //
+            //   HELLO 3 SETNAME {client}
+            //   CLIENT SETNAME {client}
+            //
+            // this might look a little redundant, but: we only do it once per connection, and it isn't
+            // many bytes different; this allows us to pipeline the entire handshake without having to
+            // add latency
+
             ResultProcessor<bool>? autoConfig = null;
             if (Multiplexer.RawConfig.TryResp3())
             {
                 log?.WriteLine($"{Format.ToString(this)}: Authenticating via HELLO");
-                var hello = Message.CreateHello(3, user, password, CommandFlags.None);
+                var hello = Message.CreateHello(3, user, password, clientName, CommandFlags.None);
                 hello.SetInternalCall();
                 await WriteDirectOrQueueFireAndForgetAsync(connection, hello, autoConfig ??= ResultProcessor.AutoConfigureProcessor.Create(log)).ForAwait();
             }
@@ -939,16 +969,10 @@ namespace StackExchange.Redis
 
             if (Multiplexer.CommandMap.IsAvailable(RedisCommand.CLIENT))
             {
-                string name = Multiplexer.ClientName;
-                if (!string.IsNullOrWhiteSpace(name))
+                if (!string.IsNullOrWhiteSpace(clientName))
                 {
-                    name = nameSanitizer.Replace(name, "");
-                }
-
-                if (!string.IsNullOrWhiteSpace(name))
-                {
-                    log?.WriteLine($"{Format.ToString(this)}: Setting client name: {name}");
-                    msg = Message.Create(-1, CommandFlags.FireAndForget, RedisCommand.CLIENT, RedisLiterals.SETNAME, (RedisValue)name);
+                    log?.WriteLine($"{Format.ToString(this)}: Setting client name: {clientName}");
+                    msg = Message.Create(-1, CommandFlags.FireAndForget, RedisCommand.CLIENT, RedisLiterals.SETNAME, (RedisValue)clientName);
                     msg.SetInternalCall();
                     await WriteDirectOrQueueFireAndForgetAsync(connection, msg, ResultProcessor.DemandOK).ForAwait();
                 }
