@@ -77,6 +77,17 @@ public sealed class Resp3Tests : TestBase
         Assert.NotNull(server.GetBridge(RedisCommand.GET)?.ClientId);
     }
 
+    [Fact]
+    public async Task ConnectWithBrokenHello()
+    {
+        var config = ConfigurationOptions.Parse(TestConfig.Current.SecureServerAndPort);
+        config.DefaultVersion = new Version("6.0");
+        config.CommandMap = CommandMap.Create(new() { ["hello"] = "bonjour" });
+        using var muxer = await ConnectionMultiplexer.ConnectAsync(config, Writer);
+        await muxer.GetDatabase().PingAsync(); // is connected
+        Assert.False(muxer.GetServerEndPoint(muxer.GetEndPoints()[0]).IsResp3);
+    }
+
     [Theory]
     [InlineData("return 42", false, ResultType.Integer, ResultType.Integer, 42)]
     [InlineData("return 'abc'", false, ResultType.BulkString, ResultType.BulkString, "abc")]
@@ -174,12 +185,12 @@ public sealed class Resp3Tests : TestBase
     [InlineData("smembers", false, ResultType.Array, ResultType.Array, SET_ABC, "skey")]
     [InlineData("smembers", true, ResultType.Array, ResultType.Set, SET_ABC, "skey")]
     [InlineData("smembers", false, ResultType.Array, ResultType.Array, EMPTY_ARR, "nkey")]
-    [InlineData("smembers", true, ResultType.Array, ResultType.Array, EMPTY_ARR, "nkey")]
+    [InlineData("smembers", true, ResultType.Array, ResultType.Set, EMPTY_ARR, "nkey")]
 
     [InlineData("hgetall", false, ResultType.Array, ResultType.Array, MAP_ABC, "hkey")]
     [InlineData("hgetall", true, ResultType.Array, ResultType.Map, MAP_ABC, "hkey")]
     [InlineData("hgetall", false, ResultType.Array, ResultType.Array, EMPTY_ARR, "nkey")]
-    [InlineData("hgetall", true, ResultType.Array, ResultType.Array, EMPTY_ARR, "nkey")]
+    [InlineData("hgetall", true, ResultType.Array, ResultType.Map, EMPTY_ARR, "nkey")]
 
     [InlineData("sismember", false, ResultType.Integer, ResultType.Integer, true, "skey", "b")]
     [InlineData("sismember", true, ResultType.Integer, ResultType.Integer, true, "skey", "b")]
@@ -190,7 +201,10 @@ public sealed class Resp3Tests : TestBase
 
     [InlineData("latency", false, ResultType.BulkString, ResultType.BulkString, STR_DAVE, "doctor")]
     [InlineData("latency", true, ResultType.BulkString, ResultType.VerbatimString, STR_DAVE, "doctor")]
-    public async Task CheckCommandRespult(string command, bool useResp3, ResultType resp2, ResultType resp3, object expected, params object[] args)
+
+    [InlineData("incrbyfloat", false, ResultType.BulkString, ResultType.BulkString, 41.5, "ikey", 1.5)]
+    [InlineData("incrbyfloat", true, ResultType.BulkString, ResultType.BulkString, 41.5, "ikey", 1.5)]
+    public async Task CheckCommandResult(string command, bool useResp3, ResultType resp2, ResultType resp3, object expected, params object[] args)
     {
         using var muxer = Create(protocol: useResp3 ? "resp3" : "resp2", require: RedisFeatures.v6_0_0);
         Assert.Equal(useResp3, muxer.GetServerEndPoint(muxer.GetEndPoints().Single()).IsResp3);
@@ -233,13 +247,16 @@ public sealed class Resp3Tests : TestBase
                 break;
             case STR_DAVE:
                 var scontent = result.ToString();
+                LogNoTime(scontent);
                 Assert.NotNull(scontent);
-                Assert.StartsWith("Dave,", scontent);
+                var isExpectedContent = scontent.StartsWith("Dave, ") || scontent.StartsWith("I'm sorry, Dave");
+                Assert.True(isExpectedContent);
                 LogNoTime(scontent);
 
                 scontent = result.ToString(out var type);
                 Assert.NotNull(scontent);
-                Assert.StartsWith("Dave,", scontent);
+                isExpectedContent = scontent.StartsWith("Dave, ") || scontent.StartsWith("I'm sorry, Dave");
+                Assert.True(isExpectedContent);
                 LogNoTime(scontent);
                 if (useResp3)
                 {

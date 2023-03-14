@@ -35,7 +35,15 @@ namespace StackExchange.Redis
             groups = "groups",
             lastGeneratedId = "last-generated-id",
             firstEntry = "first-entry",
-            lastEntry = "last-entry";
+            lastEntry = "last-entry",
+
+            // HELLO
+            version = "version",
+            proto = "proto",
+            role = "role",
+            mode = "mode",
+            id = "id",
+            unknown_command = "ERR unknown command";
     }
     internal static class RedisLiterals
     {

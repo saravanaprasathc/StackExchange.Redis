@@ -728,16 +728,30 @@ namespace StackExchange.Redis
 
             public override bool SetResult(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.IsError && result.StartsWith(CommonReplies.READONLY))
+                if (result.IsError)
                 {
-                    var bridge = connection.BridgeCouldBeNull;
-                    if (bridge != null)
+                    if (result.StartsWith(CommonReplies.READONLY))
                     {
-                        var server = bridge.ServerEndPoint;
-                        Log?.WriteLine($"{Format.ToString(server)}: Auto-configured role: replica");
-                        server.IsReplica = true;
+                        var bridge = connection.BridgeCouldBeNull;
+                        if (bridge != null)
+                        {
+                            var server = bridge.ServerEndPoint;
+                            Log?.WriteLine($"{Format.ToString(server)}: Auto-configured role: replica");
+                            server.IsReplica = true;
+                        }
+                    }
+                    else if (message.Command == RedisCommand.HELLO && result.StartsWith(CommonReplies.unknown_command))
+                    {
+                        var server = connection.BridgeCouldBeNull?.ServerEndPoint;
+                        if (server is not null)
+                        {
+                            // force retry
+                            Log?.WriteLine($"{Format.ToString(server)}: HELLO unavailable; forcing RESP2");
+                            server.ActiveProtocol = ServerEndPoint.RespProtocol.Resp2;
+                        }
                     }
                 }
+
                 return base.SetResult(connection, message, result);
             }
 
@@ -882,50 +896,37 @@ namespace StackExchange.Redis
                         }
                         else if (message?.Command == RedisCommand.HELLO)
                         {
-                            // the result is a non-homogeneous shape; we only do this for the handshake - use ScriptResult
-                            if (!RedisResult.TryCreate(connection, in result, out var handshake) || handshake.IsNull || handshake.Length < 0)
+                            var iter = result.GetItems().GetEnumerator();
+                            while (iter.MoveNext())
                             {
-                                Log?.WriteLine($"{Format.ToString(server)}: Response from HELLO is unexpected");
-                            }
-                            else
-                            {
-                                Log?.WriteLine($"{Format.ToString(server)}: Processing HELLO response ({handshake.Length} entries)");
-                                var tokens = handshake.ToDictionary(StringComparer.OrdinalIgnoreCase);
-                                if (tokens.TryGetValue("version", out var value) && value.Length < 0)
+                                ref RawResult key = ref iter.Current;
+                                if (!iter.MoveNext()) break;
+                                ref RawResult val = ref iter.Current;
+
+                                if (key.IsEqual(CommonReplies.version) && Format.TryParseVersion(val.GetString(), out var version))
                                 {
-                                    var typed = value.AsRedisValue().TryGetVersion();
-                                    if (typed is not null)
-                                    {
-                                        server.Version = typed;
-                                        Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) server-version: {typed}");
-                                    }
+                                    server.Version = version;
+                                    Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) server-version: {version}");
                                 }
-                                if (tokens.TryGetValue("proto", out value) && value.Length < 0)
+                                else if (key.IsEqual(CommonReplies.proto) && val.TryGetInt64(out var i64))
                                 {
-                                    int protocolVersion = value.AsInt32();
-                                    server.IsResp3 = protocolVersion >= 2;
-                                    Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) protocol: {protocolVersion}");
+                                    server.ActiveProtocol = i64 >= 3 ? ServerEndPoint.RespProtocol.Resp3 : ServerEndPoint.RespProtocol.Resp2;
+                                    Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) protocol: {server.ActiveProtocol}");
                                 }
-                                if (tokens.TryGetValue("id", out value) && value.Length < 0)
+                                else if (key.IsEqual(CommonReplies.id) && val.TryGetInt64(out i64))
                                 {
-                                    connection.ClientId = value.AsInt64();
-                                    Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) connection-id: {connection.ClientId}");
+                                    connection.ClientId = i64;
+                                    Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) connection-id: {i64}");
                                 }
-                                if (tokens.TryGetValue("mode", out value) && value.Length < 0)
+                                else if (key.IsEqual(CommonReplies.mode) && TryParseServerType(val.GetString(), out var serverType))
                                 {
-                                    if (TryParseServerType(value.AsString(), out var serverType))
-                                    {
-                                        server.ServerType = serverType;
-                                        Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) server-type: {serverType}");
-                                    }
+                                    server.ServerType = serverType;
+                                    Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) server-type: {serverType}");
                                 }
-                                if (tokens.TryGetValue("role", out value) && value.Length < 0)
+                                else if (key.IsEqual(CommonReplies.role) && TryParseRole(val.GetString(), out bool isReplica))
                                 {
-                                    if (TryParseRole(value.AsString(), out bool isReplica))
-                                    {
-                                        server.IsReplica = isReplica;
-                                        Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) role: {(isReplica ? "replica" : "primary")}");
-                                    }
+                                    server.IsReplica = isReplica;
+                                    Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) role: {(isReplica ? "replica" : "primary")}");
                                 }
                             }
                         }

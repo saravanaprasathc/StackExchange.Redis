@@ -704,21 +704,20 @@ namespace StackExchange.Redis
             }
         }
 
-        internal static Message CreateHello(int protocolVersion, string? username, string? password, string? clientName, CommandFlags flags)
-            => new HelloMessage(protocolVersion, username, password, clientName, flags);
+        internal static Message CreateHello(int protocolVersion, string? username, string? password, CommandFlags flags)
+            => new HelloMessage(protocolVersion, username, password, flags);
 
         internal sealed class HelloMessage : Message
         {
-            private readonly string? _username, _password, _clientName;
+            private readonly string? _username, _password;
             private readonly int _protocolVersion;
 
-            internal HelloMessage(int protocolVersion, string? username, string? password, string? clientName, CommandFlags flags)
+            internal HelloMessage(int protocolVersion, string? username, string? password, CommandFlags flags)
                 : base(-1, flags, RedisCommand.HELLO)
             {
                 _protocolVersion = protocolVersion;
                 _username = username;
                 _password = password;
-                _clientName = clientName;
             }
 
             public override string CommandAndKey => Command + " " + _protocolVersion;
@@ -729,7 +728,6 @@ namespace StackExchange.Redis
                 {
                     int count = 1; // HELLO protover
                     if (!string.IsNullOrWhiteSpace(_password)) count += 3; // [AUTH username password]
-                    if (!string.IsNullOrWhiteSpace(_clientName)) count += 2; // [SETNAME clientname]
                     return count;
                 }
             }
@@ -742,11 +740,6 @@ namespace StackExchange.Redis
                     physical.WriteBulkString(RedisLiterals.AUTH);
                     physical.WriteBulkString(string.IsNullOrWhiteSpace(_username) ? RedisLiterals.@default : _username);
                     physical.WriteBulkString(_password);
-                }
-                if (!string.IsNullOrWhiteSpace(_clientName))
-                {
-                    physical.WriteBulkString(RedisLiterals.SETNAME);
-                    physical.WriteBulkString(_clientName);
                 }
             }
         }

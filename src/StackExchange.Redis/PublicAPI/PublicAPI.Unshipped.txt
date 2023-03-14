@@ -19,5 +19,7 @@ StackExchange.Redis.ResultType.Null = 8 -> StackExchange.Redis.ResultType
 StackExchange.Redis.ResultType.Push = 37 -> StackExchange.Redis.ResultType
 StackExchange.Redis.ResultType.Set = 21 -> StackExchange.Redis.ResultType
 StackExchange.Redis.ResultType.VerbatimString = 12 -> StackExchange.Redis.ResultType
+static StackExchange.Redis.RedisResult.Create(StackExchange.Redis.RedisResult![]! values, StackExchange.Redis.ResultType resultType) -> StackExchange.Redis.RedisResult!
+static StackExchange.Redis.RedisResult.Create(StackExchange.Redis.RedisValue[]! values, StackExchange.Redis.ResultType resultType) -> StackExchange.Redis.RedisResult!
 virtual StackExchange.Redis.RedisResult.Length.get -> int
 virtual StackExchange.Redis.RedisResult.this[int index].get -> StackExchange.Redis.RedisResult!

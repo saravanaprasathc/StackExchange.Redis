@@ -198,8 +198,18 @@ namespace StackExchange.Redis
             set => SetConfig(ref version, value);
         }
 
-        // deliberately not getting fancy with future hypothetical RESP versions
-        public bool IsResp3 { get; set; }
+        internal enum RespProtocol
+        {
+            Resp2,
+            Resp3,
+        }
+        private RespProtocol? _activeProtocol;
+        internal RespProtocol ActiveProtocol
+        {
+            get => _activeProtocol ?? (Multiplexer.RawConfig.TryResp3() ? RespProtocol.Resp3 : RespProtocol.Resp2);
+            set => _activeProtocol = value;
+        }
+        public bool IsResp3 => ActiveProtocol == RespProtocol.Resp3;
 
         public int WriteEverySeconds
         {
@@ -620,11 +630,17 @@ namespace StackExchange.Redis
 
         internal Task OnEstablishingAsync(PhysicalConnection connection, LogProxy? log)
         {
-            static async Task OnEstablishingAsyncAwaited(PhysicalConnection connection, Task handshake)
+            static async Task OnEstablishingAsyncAwaited(ServerEndPoint server, PhysicalConnection connection, Task handshake, RespProtocol attemptedProtocol, LogProxy? log)
             {
                 try
                 {
                     await handshake.ForAwait();
+                    if (server.ActiveProtocol != attemptedProtocol)
+                    {
+                        // retry
+                        log?.WriteLine($"{Format.ToString(server)}: Server handshake {attemptedProtocol} failed; retrying with {server.ActiveProtocol}");
+                        await server.OnEstablishingAsync(connection, log);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -635,10 +651,19 @@ namespace StackExchange.Redis
             try
             {
                 if (connection == null) return Task.CompletedTask;
+                var attemptedProtocol = ActiveProtocol;
                 var handshake = HandshakeAsync(connection, log);
 
                 if (handshake.Status != TaskStatus.RanToCompletion)
-                    return OnEstablishingAsyncAwaited(connection, handshake);
+                {
+                    return OnEstablishingAsyncAwaited(this, connection, handshake, attemptedProtocol, log);
+                }
+                if (ActiveProtocol != attemptedProtocol)
+                {   // retry
+
+                    log?.WriteLine($"{Format.ToString(this)}: Server handshake {attemptedProtocol} failed; retrying with {ActiveProtocol}");
+                    return OnEstablishingAsync(connection, log);
+                }
             }
             catch (Exception ex)
             {
@@ -896,7 +921,7 @@ namespace StackExchange.Redis
 
         private async Task HandshakeAsync(PhysicalConnection connection, LogProxy? log)
         {
-            log?.WriteLine($"{Format.ToString(this)}: Server handshake");
+            log?.WriteLine($"{Format.ToString(this)}: Server handshake, {ActiveProtocol}");
             if (connection == null)
             {
                 Multiplexer.Trace("No connection!?");
@@ -906,70 +931,52 @@ namespace StackExchange.Redis
             // Note that we need "" (not null) for password in the case of 'nopass' logins
             string? user = Multiplexer.RawConfig.User;
             string password = Multiplexer.RawConfig.Password ?? "";
-            bool helloSuccess = false;
-
-            var bridge = connection.BridgeCouldBeNull;
-
-            string name = Multiplexer.ClientName;
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                name = nameSanitizer.Replace(name, "");
-            }
 
             ResultProcessor<bool>? autoConfig = null;
-
-            if (Multiplexer.RawConfig.TryResp3() && bridge is not null)
+            if (IsResp3)
             {
                 log?.WriteLine($"{Format.ToString(this)}: Authenticating via HELLO");
-                var hello = Message.CreateHello(3, user, password, name, CommandFlags.None);
+                var hello = Message.CreateHello(3, user, password, CommandFlags.None);
                 hello.SetInternalCall();
-                try
-                {
-                    // helloSuccess = await WriteDirectAsync(hello, autoConfig ??= ResultProcessor.AutoConfigureProcessor.Create(log), bridge).ForAwait();
-                    // TODO: how to delay?
-
-                    await WriteDirectOrQueueFireAndForgetAsync(connection, hello, autoConfig ??= ResultProcessor.AutoConfigureProcessor.Create(log)).ForAwait();
-                    // TODO: detect -WRONGPASS and react?
-                }
-                catch (Exception ex)
-                {
-                    log?.WriteLine($"HELLO failed: {ex.Message}");
-                }
+                await WriteDirectOrQueueFireAndForgetAsync(connection, hello, autoConfig ??= ResultProcessor.AutoConfigureProcessor.Create(log)).ForAwait();
             }
-
-            if (!helloSuccess)
+            else if (!string.IsNullOrWhiteSpace(user))
             {
-                if (!string.IsNullOrWhiteSpace(user))
-                {
-                    log?.WriteLine($"{Format.ToString(this)}: Authenticating (user/password)");
-                    msg = Message.Create(-1, CommandFlags.FireAndForget, RedisCommand.AUTH, (RedisValue)user, (RedisValue)password);
-                    msg.SetInternalCall();
-                    await WriteDirectOrQueueFireAndForgetAsync(connection, msg, ResultProcessor.DemandOK).ForAwait();
-                }
-                else if (!string.IsNullOrWhiteSpace(password))
-                {
-                    log?.WriteLine($"{Format.ToString(this)}: Authenticating (password)");
-                    msg = Message.Create(-1, CommandFlags.FireAndForget, RedisCommand.AUTH, (RedisValue)password);
-                    msg.SetInternalCall();
-                    await WriteDirectOrQueueFireAndForgetAsync(connection, msg, ResultProcessor.DemandOK).ForAwait();
-                }
-
-                if (Multiplexer.CommandMap.IsAvailable(RedisCommand.CLIENT))
-                {
-                    if (!string.IsNullOrWhiteSpace(name))
-                    {
-                        log?.WriteLine($"{Format.ToString(this)}: Setting client name: {name}");
-                        msg = Message.Create(-1, CommandFlags.FireAndForget, RedisCommand.CLIENT, RedisLiterals.SETNAME, (RedisValue)name);
-                        msg.SetInternalCall();
-                        await WriteDirectOrQueueFireAndForgetAsync(connection, msg, ResultProcessor.DemandOK).ForAwait();
-                    }
-
-                    msg = Message.Create(-1, default, RedisCommand.CLIENT, RedisLiterals.ID);
-                    msg.SetInternalCall();
-                    await WriteDirectOrQueueFireAndForgetAsync(connection, msg, autoConfig ??= ResultProcessor.AutoConfigureProcessor.Create(log)).ForAwait();
-                }
+                log?.WriteLine($"{Format.ToString(this)}: Authenticating (user/password)");
+                msg = Message.Create(-1, CommandFlags.FireAndForget, RedisCommand.AUTH, (RedisValue)user, (RedisValue)password);
+                msg.SetInternalCall();
+                await WriteDirectOrQueueFireAndForgetAsync(connection, msg, ResultProcessor.DemandOK).ForAwait();
+            }
+            else if (!string.IsNullOrWhiteSpace(password))
+            {
+                log?.WriteLine($"{Format.ToString(this)}: Authenticating (password)");
+                msg = Message.Create(-1, CommandFlags.FireAndForget, RedisCommand.AUTH, (RedisValue)password);
+                msg.SetInternalCall();
+                await WriteDirectOrQueueFireAndForgetAsync(connection, msg, ResultProcessor.DemandOK).ForAwait();
             }
 
+            if (Multiplexer.CommandMap.IsAvailable(RedisCommand.CLIENT))
+            {
+                string name = Multiplexer.ClientName;
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    name = nameSanitizer.Replace(name, "");
+                }
+
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    log?.WriteLine($"{Format.ToString(this)}: Setting client name: {name}");
+                    msg = Message.Create(-1, CommandFlags.FireAndForget, RedisCommand.CLIENT, RedisLiterals.SETNAME, (RedisValue)name);
+                    msg.SetInternalCall();
+                    await WriteDirectOrQueueFireAndForgetAsync(connection, msg, ResultProcessor.DemandOK).ForAwait();
+                }
+
+                msg = Message.Create(-1, default, RedisCommand.CLIENT, RedisLiterals.ID);
+                msg.SetInternalCall();
+                await WriteDirectOrQueueFireAndForgetAsync(connection, msg, autoConfig ??= ResultProcessor.AutoConfigureProcessor.Create(log)).ForAwait();
+            }
+
+            var bridge = connection.BridgeCouldBeNull;
             if (bridge is null)
             {
                 return;

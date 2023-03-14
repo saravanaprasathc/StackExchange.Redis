@@ -18,6 +18,7 @@ namespace StackExchange.Redis
         /// <param name="value">The <see cref="RedisValue"/> to create a result from.</param>
         /// <param name="resultType">The type of result being represented</param>
         /// <returns> new <see cref="RedisResult"/>.</returns>
+        [SuppressMessage("ApiDesign", "RS0027:Public API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = "<Pending>")]
         public static RedisResult Create(RedisValue value, ResultType? resultType = null) => new SingleRedisResult(value, resultType);
 
         /// <summary>
@@ -25,9 +26,18 @@ namespace StackExchange.Redis
         /// </summary>
         /// <param name="values">The <see cref="RedisValue"/>s to create a result from.</param>
         /// <returns> new <see cref="RedisResult"/>.</returns>
-        public static RedisResult Create(RedisValue[] values) =>
-            values == null ? NullArray : values.Length == 0 ? EmptyArray :
-                new ArrayRedisResult(Array.ConvertAll(values, value => new SingleRedisResult(value, null)), ResultType.Array);
+        public static RedisResult Create(RedisValue[] values)
+            => Create(values, ResultType.Array);
+
+        /// <summary>
+        /// Create a new RedisResult representing an array of values.
+        /// </summary>
+        /// <param name="values">The <see cref="RedisValue"/>s to create a result from.</param>
+        /// <returns> new <see cref="RedisResult"/>.</returns>
+        /// <param name="resultType">The explicit data type</param>
+        public static RedisResult Create(RedisValue[] values, ResultType resultType) =>
+            values == null ? NullArray : values.Length == 0 ? EmptyArray(resultType) :
+                new ArrayRedisResult(Array.ConvertAll(values, value => new SingleRedisResult(value, null)), resultType);
 
         /// <summary>
         /// Create a new RedisResult representing an array of values.
@@ -35,12 +45,29 @@ namespace StackExchange.Redis
         /// <param name="values">The <see cref="RedisResult"/>s to create a result from.</param>
         /// <returns> new <see cref="RedisResult"/>.</returns>
         public static RedisResult Create(RedisResult[] values)
-            => values == null ? NullArray : values.Length == 0 ? EmptyArray : new ArrayRedisResult(values, ResultType.Array);
+            => Create(values, ResultType.Array);
+
+        /// <summary>
+        /// Create a new RedisResult representing an array of values.
+        /// </summary>
+        /// <param name="values">The <see cref="RedisResult"/>s to create a result from.</param>
+        /// <returns> new <see cref="RedisResult"/>.</returns>
+        /// <param name="resultType">The explicit data type</param>
+        public static RedisResult Create(RedisResult[] values, ResultType resultType)
+            => values == null ? NullArray : values.Length == 0 ? EmptyArray(resultType) : new ArrayRedisResult(values, resultType);
 
         /// <summary>
         /// An empty array result.
         /// </summary>
-        internal static RedisResult EmptyArray { get; } = new ArrayRedisResult(Array.Empty<RedisResult>(), ResultType.Array);
+        internal static RedisResult EmptyArray(ResultType type) => type switch
+        {
+            ResultType.Array => s_EmptyArray ??= new ArrayRedisResult(Array.Empty<RedisResult>(), type),
+            ResultType.Set => s_EmptySet ??= new ArrayRedisResult(Array.Empty<RedisResult>(), type),
+            ResultType.Map => s_EmptyMap ??= new ArrayRedisResult(Array.Empty<RedisResult>(), type),
+            _ => new ArrayRedisResult(Array.Empty<RedisResult>(), type),
+        };
+
+        private static RedisResult? s_EmptyArray, s_EmptySet, s_EmptyMap;
 
         /// <summary>
         /// A null array result.
@@ -75,6 +102,10 @@ namespace StackExchange.Redis
         {
             try
             {
+                if (result.Resp3Type == ResultType.Null)
+                {
+                    Console.Write("hi");
+                }
                 switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
@@ -91,7 +122,7 @@ namespace StackExchange.Redis
                         var items = result.GetItems();
                         if (items.Length == 0)
                         {
-                            redisResult = EmptyArray;
+                            redisResult = EmptyArray(result.Resp3Type);
                             return true;
                         }
                         var arr = new RedisResult[items.Length];

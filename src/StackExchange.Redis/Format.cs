@@ -482,14 +482,17 @@ namespace StackExchange.Redis
 #endif
         }
 
-        internal static bool TryParseVersion(string input, [NotNullWhen(true)] out Version? version)
+        internal static bool TryParseVersion(string? input, [NotNullWhen(true)] out Version? version)
         {
-            if (Version.TryParse(input, out version)) return true;
-            // allow major-only (Version doesn't do this, because... reasons?)
-            if (TryParseInt32(input, out int i32))
+            if (input is not null)
             {
-                version = new(i32, 0);
-                return true;
+                if (Version.TryParse(input, out version)) return true;
+                // allow major-only (Version doesn't do this, because... reasons?)
+                if (TryParseInt32(input, out int i32))
+                {
+                    version = new(i32, 0);
+                    return true;
+                }
             }
             version = null;
             return false;
