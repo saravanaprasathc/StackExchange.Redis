@@ -198,18 +198,7 @@ namespace StackExchange.Redis
             set => SetConfig(ref version, value);
         }
 
-        internal enum RespProtocol
-        {
-            Resp2,
-            Resp3,
-        }
-        private RespProtocol? _activeProtocol;
-        internal RespProtocol ActiveProtocol
-        {
-            get => _activeProtocol ?? (Multiplexer.RawConfig.TryResp3() ? RespProtocol.Resp3 : RespProtocol.Resp2);
-            set => _activeProtocol = value;
-        }
-        public bool IsResp3 => ActiveProtocol == RespProtocol.Resp3;
+        public bool IsResp3 {get;set;}
 
         public int WriteEverySeconds
         {
@@ -630,17 +619,11 @@ namespace StackExchange.Redis
 
         internal Task OnEstablishingAsync(PhysicalConnection connection, LogProxy? log)
         {
-            static async Task OnEstablishingAsyncAwaited(ServerEndPoint server, PhysicalConnection connection, Task handshake, RespProtocol attemptedProtocol, LogProxy? log)
+            static async Task OnEstablishingAsyncAwaited(PhysicalConnection connection, Task handshake)
             {
                 try
                 {
                     await handshake.ForAwait();
-                    if (server.ActiveProtocol != attemptedProtocol)
-                    {
-                        // retry
-                        log?.WriteLine($"{Format.ToString(server)}: Server handshake {attemptedProtocol} failed; retrying with {server.ActiveProtocol}");
-                        await server.OnEstablishingAsync(connection, log);
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -651,18 +634,12 @@ namespace StackExchange.Redis
             try
             {
                 if (connection == null) return Task.CompletedTask;
-                var attemptedProtocol = ActiveProtocol;
+
                 var handshake = HandshakeAsync(connection, log);
 
                 if (handshake.Status != TaskStatus.RanToCompletion)
                 {
-                    return OnEstablishingAsyncAwaited(this, connection, handshake, attemptedProtocol, log);
-                }
-                if (ActiveProtocol != attemptedProtocol)
-                {   // retry
-
-                    log?.WriteLine($"{Format.ToString(this)}: Server handshake {attemptedProtocol} failed; retrying with {ActiveProtocol}");
-                    return OnEstablishingAsync(connection, log);
+                    return OnEstablishingAsyncAwaited(connection, handshake);
                 }
             }
             catch (Exception ex)
@@ -921,7 +898,7 @@ namespace StackExchange.Redis
 
         private async Task HandshakeAsync(PhysicalConnection connection, LogProxy? log)
         {
-            log?.WriteLine($"{Format.ToString(this)}: Server handshake, {ActiveProtocol}");
+            log?.WriteLine($"{Format.ToString(this)}: Server handshake");
             if (connection == null)
             {
                 Multiplexer.Trace("No connection!?");
@@ -932,15 +909,20 @@ namespace StackExchange.Redis
             string? user = Multiplexer.RawConfig.User;
             string password = Multiplexer.RawConfig.Password ?? "";
 
+            IsResp3 = false; // assume we don't succeed with RESP3; will be updated in the HELLO processor
+
             ResultProcessor<bool>? autoConfig = null;
-            if (IsResp3)
+            if (Multiplexer.RawConfig.TryResp3())
             {
                 log?.WriteLine($"{Format.ToString(this)}: Authenticating via HELLO");
                 var hello = Message.CreateHello(3, user, password, CommandFlags.None);
                 hello.SetInternalCall();
                 await WriteDirectOrQueueFireAndForgetAsync(connection, hello, autoConfig ??= ResultProcessor.AutoConfigureProcessor.Create(log)).ForAwait();
             }
-            else if (!string.IsNullOrWhiteSpace(user))
+
+            // note: we auth EVEN IF we have used HELLO to AUTH; because otherwise the fallback/detection path is pure hell,
+            // and: we're pipelined here, so... meh
+            if (!string.IsNullOrWhiteSpace(user))
             {
                 log?.WriteLine($"{Format.ToString(this)}: Authenticating (user/password)");
                 msg = Message.Create(-1, CommandFlags.FireAndForget, RedisCommand.AUTH, (RedisValue)user, (RedisValue)password);

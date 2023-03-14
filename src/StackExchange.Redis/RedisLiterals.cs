@@ -42,8 +42,7 @@ namespace StackExchange.Redis
             proto = "proto",
             role = "role",
             mode = "mode",
-            id = "id",
-            unknown_command = "ERR unknown command";
+            id = "id";
     }
     internal static class RedisLiterals
     {

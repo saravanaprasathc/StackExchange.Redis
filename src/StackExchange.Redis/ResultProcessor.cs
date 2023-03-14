@@ -740,16 +740,6 @@ namespace StackExchange.Redis
                             server.IsReplica = true;
                         }
                     }
-                    else if (message.Command == RedisCommand.HELLO && result.StartsWith(CommonReplies.unknown_command))
-                    {
-                        var server = connection.BridgeCouldBeNull?.ServerEndPoint;
-                        if (server is not null)
-                        {
-                            // force retry
-                            Log?.WriteLine($"{Format.ToString(server)}: HELLO unavailable; forcing RESP2");
-                            server.ActiveProtocol = ServerEndPoint.RespProtocol.Resp2;
-                        }
-                    }
                 }
 
                 return base.SetResult(connection, message, result);
@@ -910,8 +900,8 @@ namespace StackExchange.Redis
                                 }
                                 else if (key.IsEqual(CommonReplies.proto) && val.TryGetInt64(out var i64))
                                 {
-                                    server.ActiveProtocol = i64 >= 3 ? ServerEndPoint.RespProtocol.Resp3 : ServerEndPoint.RespProtocol.Resp2;
-                                    Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) protocol: {server.ActiveProtocol}");
+                                    server.IsResp3 = i64 >= 3;
+                                    Log?.WriteLine($"{Format.ToString(server)}: Auto-configured (HELLO) protocol: {(server.IsResp3 ? "RESP3" : "RESP2")}");
                                 }
                                 else if (key.IsEqual(CommonReplies.id) && val.TryGetInt64(out i64))
                                 {

@@ -77,15 +77,20 @@ public sealed class Resp3Tests : TestBase
         Assert.NotNull(server.GetBridge(RedisCommand.GET)?.ClientId);
     }
 
-    [Fact]
-    public async Task ConnectWithBrokenHello()
+    [Theory]
+    [InlineData("HELLO", true)]
+    [InlineData("BONJOUR", false)]
+    public async Task ConnectWithBrokenHello(string command, bool isResp3)
     {
         var config = ConfigurationOptions.Parse(TestConfig.Current.SecureServerAndPort);
+        config.Password = TestConfig.Current.SecurePassword;
         config.DefaultVersion = new Version("6.0");
-        config.CommandMap = CommandMap.Create(new() { ["hello"] = "bonjour" });
+        config.CommandMap = CommandMap.Create(new() { ["hello"] = command });
         using var muxer = await ConnectionMultiplexer.ConnectAsync(config, Writer);
         await muxer.GetDatabase().PingAsync(); // is connected
-        Assert.False(muxer.GetServerEndPoint(muxer.GetEndPoints()[0]).IsResp3);
+        Assert.Equal(isResp3, muxer.GetServerEndPoint(muxer.GetEndPoints()[0]).IsResp3);
+        var result = await muxer.GetDatabase().ExecuteAsync("latency", "doctor");
+        Assert.Equal(isResp3 ? ResultType.VerbatimString : ResultType.BulkString, result.Resp3Type);
     }
 
     [Theory]
