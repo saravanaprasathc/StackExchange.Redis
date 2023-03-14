@@ -57,6 +57,16 @@ namespace StackExchange.Redis
         /// </summary>
         public virtual int Length => -1;
 
+        /// <inheritdoc/>
+        public sealed override string ToString() => ToString(out _) ?? "";
+
+        /// <summary>
+        /// Gets the string content as per <see cref="ToString()"/>, but also obtains the declared type from verbatim strings (for example <c>LATENCY DOCTOR</c>)
+        /// </summary>
+        /// <param name="type">The type of the returned string</param>
+        /// <returns>The content</returns>
+        public abstract string? ToString(out string? type);
+
         /// <summary>
         /// Internally, this is very similar to RawResult, except it is designed to be usable,
         /// outside of the IO-processing pipeline: the buffers are standalone, etc.
@@ -65,7 +75,7 @@ namespace StackExchange.Redis
         {
             try
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -327,7 +337,11 @@ namespace StackExchange.Redis
 
             public override int Length => _value is null ? -1 : _value.Length;
 
-            public override string ToString() => _value == null ? "(nil)" : (_value.Length + " element(s)");
+            public override string? ToString(out string? type)
+            {
+                type = null;
+                return _value == null ? "(nil)" : (_value.Length + " element(s)");
+            }
 
             internal override bool AsBoolean()
             {
@@ -483,7 +497,11 @@ namespace StackExchange.Redis
             }
 
             public override bool IsNull => value == null;
-            public override string ToString() => value;
+            public override string? ToString(out string? type)
+            {
+                type = null;
+                return value;
+            }
             internal override bool AsBoolean() => throw new RedisServerException(value);
             internal override bool[] AsBooleanArray() => throw new RedisServerException(value);
             internal override byte[] AsByteArray() => throw new RedisServerException(value);
@@ -521,7 +539,18 @@ namespace StackExchange.Redis
 
             public override bool IsNull => Resp3Type == ResultType.Null || _value.IsNull;
 
-            public override string ToString() => _value.ToString();
+            public override string? ToString(out string? type)
+            {
+                type = null;
+                string? s = _value;
+                if (Resp3Type == ResultType.VerbatimString && s is not null && s.Length >= 4 && s[3] == ':')
+                {   // remove the prefix
+                    type = s.Substring(0, 3);
+                    s = s.Substring(4);
+                }
+                return s;
+            }
+
             internal override bool AsBoolean() => (bool)_value;
             internal override bool[] AsBooleanArray() => new[] { AsBoolean() };
             internal override byte[]? AsByteArray() => (byte[]?)_value;

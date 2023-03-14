@@ -333,7 +333,7 @@ namespace StackExchange.Redis
         private void UnexpectedResponse(Message message, in RawResult result)
         {
             ConnectionMultiplexer.TraceWithoutContext("From " + GetType().Name, "Unexpected Response");
-            ConnectionFail(message, ConnectionFailureType.ProtocolFailure, "Unexpected response to " + (message?.Command.ToString() ?? "n/a") + ": " + result.ToString());
+            ConnectionFail(message, ConnectionFailureType.ProtocolFailure, "Unexpected response to " + (message?.CommandString ?? "n/a") + ": " + result.ToString());
         }
 
         public sealed class TimeSpanProcessor : ResultProcessor<TimeSpan?>
@@ -346,7 +346,7 @@ namespace StackExchange.Redis
 
             public bool TryParse(in RawResult result, out TimeSpan? expiry)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                         long time;
@@ -396,7 +396,7 @@ namespace StackExchange.Redis
 
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.Error)
+                if (result.IsError)
                 {
                     return false;
                 }
@@ -453,7 +453,7 @@ namespace StackExchange.Redis
 
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.Array)
+                if (result.Resp2TypeArray == ResultType.Array)
                 {
                     var items = result.GetItems();
                     if (items.Length >= 3 && items[2].TryGetInt64(out long count))
@@ -479,7 +479,7 @@ namespace StackExchange.Redis
         {
             public static bool TryGet(in RawResult result, out bool value)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -547,7 +547,7 @@ namespace StackExchange.Redis
             // (is that a thing?) will be wrapped in the RedisResult
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.BulkString:
                         var asciiHash = result.GetBlob();
@@ -572,16 +572,16 @@ namespace StackExchange.Redis
         {
             public static bool TryParse(in RawResult result, out SortedSetEntry? entry)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
-                        var arr = result.GetItems();
-                        if (result.IsNull || arr.Length < 2)
+                        if (result.IsNull || result.ItemsCount < 2)
                         {
                             entry = null;
                         }
                         else
                         {
+                            var arr = result.GetItems();
                             entry = new SortedSetEntry(arr[0].AsRedisValue(), arr[1].TryGetDouble(out double val) ? val : double.NaN);
                         }
                         return true;
@@ -612,7 +612,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.Array)
+                if (result.Resp2TypeArray == ResultType.Array)
                 {
                     if (result.IsNull)
                     {
@@ -633,7 +633,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.Array)
+                if (result.Resp2TypeArray == ResultType.Array)
                 {
                     if (result.IsNull)
                     {
@@ -665,7 +665,7 @@ namespace StackExchange.Redis
             public bool TryParse(in RawResult result, out T[]? pairs, bool allowOversized, out int count)
             {
                 count = 0;
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         var arr = result.GetItems();
@@ -746,7 +746,7 @@ namespace StackExchange.Redis
                 var server = connection.BridgeCouldBeNull?.ServerEndPoint;
                 if (server == null) return false;
 
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                         if (message?.Command == RedisCommand.CLIENT)
@@ -995,7 +995,7 @@ namespace StackExchange.Redis
                     SetResult(message, false); // lots of ops return (nil) when they mean "no"
                     return true;
                 }
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.SimpleString:
                         if (result.IsEqual(CommonReplies.OK))
@@ -1028,7 +1028,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.BulkString:
                         SetResult(message, result.GetBlob());
@@ -1051,7 +1051,7 @@ namespace StackExchange.Redis
 
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.BulkString:
                         string nodes = result.GetString()!;
@@ -1069,7 +1069,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -1104,7 +1104,7 @@ namespace StackExchange.Redis
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
                 long unixTime;
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Integer:
                         if (result.TryGetInt64(out unixTime))
@@ -1148,7 +1148,7 @@ namespace StackExchange.Redis
 
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer when result.TryGetInt64(out var duration):
                         DateTime? expiry = duration switch
@@ -1173,7 +1173,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                         long i64;
@@ -1223,7 +1223,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.BulkString)
+                if (result.Resp2TypeBulkString == ResultType.BulkString)
                 {
                     string category = Normalize(null);
                     var list = new List<Tuple<string, KeyValuePair<string, string>>>();
@@ -1269,7 +1269,7 @@ namespace StackExchange.Redis
                     SetResult(message, _defaultValue);
                     return true;
                 }
-                if (result.Resp2Type == ResultType.Integer && result.TryGetInt64(out var i64))
+                if (result.Resp2TypeBulkString == ResultType.Integer && result.TryGetInt64(out var i64))
                 {
                     SetResult(message, i64);
                     return true;
@@ -1282,7 +1282,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -1303,7 +1303,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.Array)
+                if (result.Resp2TypeArray == ResultType.Array)
                 {
                     var arr = result.GetItems();
                     if (arr.Length == 2 && arr[1].TryGetInt64(out long val))
@@ -1320,7 +1320,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.Array && !result.IsNull)
+                if (result.Resp2TypeArray == ResultType.Array && !result.IsNull)
                 {
                     var arr = result.GetItemsAsDoubles()!;
                     SetResult(message, arr);
@@ -1334,7 +1334,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -1360,7 +1360,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -1402,7 +1402,7 @@ namespace StackExchange.Redis
             }
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         var final = result.ToArray(
@@ -1420,7 +1420,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         var arr = result.GetItemsAsKeys()!;
@@ -1435,7 +1435,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -1451,7 +1451,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.SimpleString:
                     case ResultType.BulkString:
@@ -1470,7 +1470,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     // allow a single item to pass explicitly pretending to be an array; example: SPOP {key} 1
                     case ResultType.BulkString:
@@ -1493,7 +1493,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.Array && !result.IsNull)
+                if (result.Resp2TypeArray == ResultType.Array && !result.IsNull)
                 {
                     var arr = result.ToArray((in RawResult x) => (long)x.AsRedisValue())!;
                     SetResult(message, arr);
@@ -1508,7 +1508,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         var arr = result.GetItemsAsStrings()!;
@@ -1524,7 +1524,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         var arr = result.GetItemsAsStringsNotNullable()!;
@@ -1539,7 +1539,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.Array && !result.IsNull)
+                if (result.Resp2TypeArray == ResultType.Array && !result.IsNull)
                 {
                     var arr = result.GetItemsAsBooleans()!;
                     SetResult(message, arr);
@@ -1553,7 +1553,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         var pos = result.GetItemsAsGeoPosition();
@@ -1569,7 +1569,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         var arr = result.GetItemsAsGeoPositionArray()!;
@@ -1606,7 +1606,7 @@ namespace StackExchange.Redis
 
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         var typed = result.ToArray(
@@ -1668,9 +1668,8 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
-                    case ResultType.BulkString:
                     case ResultType.Array:
                         SetResult(message, Parse(result));
                         return true;
@@ -1703,7 +1702,7 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -1848,7 +1847,7 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -1864,7 +1863,7 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             public override bool SetResult(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.Error && result.StartsWith(CommonReplies.NOSCRIPT))
+                if (result.IsError && result.StartsWith(CommonReplies.NOSCRIPT))
                 { // scripts are not flushed individually, so assume the entire script cache is toast ("SCRIPT FLUSH")
                     connection.BridgeCouldBeNull?.ServerEndPoint?.FlushScriptCache();
                     message.SetScriptUnavailable();
@@ -1907,7 +1906,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                     return true;
                 }
 
-                if (result.Resp2Type != ResultType.Array)
+                if (result.Resp2TypeArray != ResultType.Array)
                 {
                     return false;
                 }
@@ -1988,7 +1987,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                     return true;
                 }
 
-                if (result.Resp2Type != ResultType.Array)
+                if (result.Resp2TypeArray != ResultType.Array)
                 {
                     return false;
                 }
@@ -2017,7 +2016,7 @@ The coordinates as a two items x,y array (longitude,latitude).
             {
                 // See https://redis.io/commands/xautoclaim for command documentation.
                 // Note that the result should never be null, so intentionally treating it as a failure to parse here
-                if (result.Resp2Type == ResultType.Array && !result.IsNull)
+                if (result.Resp2TypeArray == ResultType.Array && !result.IsNull)
                 {
                     var items = result.GetItems();
 
@@ -2046,7 +2045,7 @@ The coordinates as a two items x,y array (longitude,latitude).
             {
                 // See https://redis.io/commands/xautoclaim for command documentation.
                 // Note that the result should never be null, so intentionally treating it as a failure to parse here
-                if (result.Resp2Type == ResultType.Array && !result.IsNull)
+                if (result.Resp2TypeArray == ResultType.Array && !result.IsNull)
                 {
                     var items = result.GetItems();
 
@@ -2194,7 +2193,7 @@ The coordinates as a two items x,y array (longitude,latitude).
 
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type != ResultType.Array)
+                if (result.Resp2TypeArray != ResultType.Array)
                 {
                     return false;
                 }
@@ -2231,7 +2230,7 @@ The coordinates as a two items x,y array (longitude,latitude).
             //        2) "banana"
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type != ResultType.Array)
+                if (result.Resp2TypeArray != ResultType.Array)
                 {
                     return false;
                 }
@@ -2307,7 +2306,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                 // 5) 1) 1) "Joe"
                 //       2) "8"
 
-                if (result.Resp2Type != ResultType.Array)
+                if (result.Resp2TypeArray != ResultType.Array)
                 {
                     return false;
                 }
@@ -2351,7 +2350,7 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type != ResultType.Array)
+                if (result.Resp2TypeArray != ResultType.Array)
                 {
                     return false;
                 }
@@ -2378,7 +2377,7 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             protected static StreamEntry ParseRedisStreamEntry(in RawResult item)
             {
-                if (item.IsNull || item.Resp2Type != ResultType.Array)
+                if (item.IsNull || item.Resp2TypeArray != ResultType.Array)
                 {
                     return StreamEntry.Null;
                 }
@@ -2410,7 +2409,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                 //       3) "temperature"
                 //       4) "18.2"
 
-                if (result.Resp2Type != ResultType.Array || result.IsNull)
+                if (result.Resp2TypeArray != ResultType.Array || result.IsNull)
                 {
                     return Array.Empty<NameValueEntry>();
                 }
@@ -2445,7 +2444,7 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -2469,7 +2468,7 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeBulkString)
                 {
                     case ResultType.SimpleString:
                     case ResultType.BulkString:
@@ -2529,26 +2528,19 @@ The coordinates as a two items x,y array (longitude,latitude).
                 switch (message.Command)
                 {
                     case RedisCommand.ECHO:
-                        happy = result.Resp2Type == ResultType.BulkString && (!establishConnection || result.IsEqual(connection.BridgeCouldBeNull?.Multiplexer?.UniqueId));
+                        happy = result.Resp2TypeBulkString == ResultType.BulkString && (!establishConnection || result.IsEqual(connection.BridgeCouldBeNull?.Multiplexer?.UniqueId));
                         break;
                     case RedisCommand.PING:
                         // there are two different PINGs; "interactive" is a +PONG or +{your message},
                         // but subscriber returns a bulk-array of [ "pong", {your message} ]
-                        switch (result.Resp2Type)
+                        switch (result.Resp2TypeArray)
                         {
                             case ResultType.SimpleString:
                                 happy = result.IsEqual(CommonReplies.PONG);
                                 break;
-                            case ResultType.Array:
-                                if (result.ItemsCount == 2)
-                                {
-                                    var items = result.GetItems();
-                                    happy = items[0].IsEqual(CommonReplies.PONG) && items[1].Payload.IsEmpty;
-                                }
-                                else
-                                {
-                                    happy = false;
-                                }
+                            case ResultType.Array when result.ItemsCount == 2:
+                                var items = result.GetItems();
+                                happy = items[0].IsEqual(CommonReplies.PONG) && items[1].Payload.IsEmpty;
                                 break;
                             default:
                                 happy = false;
@@ -2556,10 +2548,10 @@ The coordinates as a two items x,y array (longitude,latitude).
                         }
                         break;
                     case RedisCommand.TIME:
-                        happy = result.Resp2Type == ResultType.Array && result.GetItems().Length == 2;
+                        happy = result.Resp2TypeArray == ResultType.Array && result.ItemsCount == 2;
                         break;
                     case RedisCommand.EXISTS:
-                        happy = result.Resp2Type == ResultType.Integer;
+                        happy = result.Resp2TypeBulkString == ResultType.Integer;
                         break;
                     default:
                         happy = false;
@@ -2588,7 +2580,7 @@ The coordinates as a two items x,y array (longitude,latitude).
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         var items = result.GetItems();
@@ -2618,7 +2610,7 @@ The coordinates as a two items x,y array (longitude,latitude).
             {
                 List<EndPoint> endPoints = new List<EndPoint>();
 
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         foreach (RawResult item in result.GetItems())
@@ -2652,7 +2644,7 @@ The coordinates as a two items x,y array (longitude,latitude).
             {
                 List<EndPoint> endPoints = new List<EndPoint>();
 
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         foreach (RawResult item in result.GetItems())
@@ -2694,7 +2686,7 @@ The coordinates as a two items x,y array (longitude,latitude).
                     return false;
                 }
 
-                switch (result.Resp2Type)
+                switch (result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         var arrayOfArrays = result.GetItems();
@@ -2736,7 +2728,7 @@ The coordinates as a two items x,y array (longitude,latitude).
     {
         protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
         {
-            switch(result.Resp2Type)
+            switch(result.Resp2TypeArray)
             {
                 case ResultType.Array:
                     var items = result.GetItems();

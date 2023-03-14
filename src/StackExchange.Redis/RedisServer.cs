@@ -923,12 +923,12 @@ namespace StackExchange.Redis
             {
                 protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
                 {
-                    switch (result.Resp2Type)
+                    switch (result.Resp2TypeArray)
                     {
                         case ResultType.Array:
                             var arr = result.GetItems();
                             RawResult inner;
-                            if (arr.Length == 2 && (inner = arr[1]).Resp2Type == ResultType.Array)
+                            if (arr.Length == 2 && (inner = arr[1]).Resp2TypeArray == ResultType.Array)
                             {
                                 var items = inner.GetItems();
                                 RedisKey[] keys;

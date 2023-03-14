@@ -73,7 +73,7 @@ namespace StackExchange.Redis
         {
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                switch(result.Resp2Type)
+                switch(result.Resp2TypeArray)
                 {
                     case ResultType.Array:
                         var parts = result.GetItems();

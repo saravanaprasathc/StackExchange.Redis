@@ -632,6 +632,9 @@ namespace StackExchange.Redis
         /// Gets if this command should be sent over the subscription bridge.
         /// </summary>
         internal bool IsForSubscriptionBridge => (Flags & DemandSubscriptionConnection) != 0;
+
+        public virtual string CommandString => Command.ToString();
+
         /// <summary>
         /// Sends this command to the subscription connection rather than the interactive.
         /// </summary>

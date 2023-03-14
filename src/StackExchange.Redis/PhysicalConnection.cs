@@ -1528,7 +1528,7 @@ namespace StackExchange.Redis
         private void MatchResult(in RawResult result)
         {
             // check to see if it could be an out-of-band pubsub message
-            if ((connectionType == ConnectionType.Subscription && result.Resp2Type == ResultType.Array) || result.Resp3Type == ResultType.Push)
+            if ((connectionType == ConnectionType.Subscription && result.Resp2TypeArray == ResultType.Array) || result.Resp3Type == ResultType.Push)
             {
                 var muxer = BridgeCouldBeNull?.Multiplexer;
                 if (muxer == null) return;
@@ -1614,7 +1614,7 @@ namespace StackExchange.Redis
                     parsed = RedisValue.Null;
                     return true;
                 }
-                switch (value.Resp2Type)
+                switch (value.Resp2TypeBulkString)
                 {
                     case ResultType.Integer:
                     case ResultType.SimpleString:
@@ -1816,24 +1816,25 @@ namespace StackExchange.Redis
             var itemCount = ReadLineTerminatedString(ResultType.Integer, ref reader);
             if (itemCount.HasValue)
             {
-                if (!itemCount.TryGetInt64(out long i64)) throw ExceptionFactory.ConnectionFailure(includeDetailInExceptions, ConnectionFailureType.ProtocolFailure, "Invalid array length", server);
+                if (!itemCount.TryGetInt64(out long i64)) throw ExceptionFactory.ConnectionFailure(includeDetailInExceptions, ConnectionFailureType.ProtocolFailure,
+                     itemCount.Is('?') ? "Streamed aggregate types not yet implemented" : "Invalid array length", server);
                 int itemCountActual = checked((int)i64);
 
                 if (itemCountActual < 0)
                 {
                     //for null response by command like EXEC, RESP array: *-1\r\n
-                    return RawResult.NullArray;
+                    return new RawResult(resultType, items: default, isNull: true);
                 }
                 else if (itemCountActual == 0)
                 {
                     //for zero array response by command like SCAN, Resp array: *0\r\n 
-                    return new RawResult(resultType, items: default);
+                    return new RawResult(resultType, items: default, isNull: false);
                 }
 
                 if (resultType == ResultType.Map) itemCountActual <<= 1; // if it says "3", it means 3 pairs, i.e. 6 values
 
                 var oversized = arena.Allocate(itemCountActual);
-                var result = new RawResult(resultType, oversized);
+                var result = new RawResult(resultType, oversized, isNull: false);
 
                 if (oversized.IsSingleSegment)
                 {
@@ -1869,11 +1870,15 @@ namespace StackExchange.Redis
             var prefix = ReadLineTerminatedString(ResultType.Integer, ref reader);
             if (prefix.HasValue)
             {
-                if (!prefix.TryGetInt64(out long i64)) throw ExceptionFactory.ConnectionFailure(includeDetailInExceptions, ConnectionFailureType.ProtocolFailure, "Invalid bulk string length", server);
+                if (!prefix.TryGetInt64(out long i64))
+                {
+                    throw ExceptionFactory.ConnectionFailure(includeDetailInExceptions, ConnectionFailureType.ProtocolFailure,
+                        prefix.Is('?') ? "Streamed strings not yet implemented" : "Invalid bulk string length", server);
+                }
                 int bodySize = checked((int)i64);
                 if (bodySize < 0)
                 {
-                    return new RawResult(ResultType.Null, ReadOnlySequence<byte>.Empty);
+                    return new RawResult(type, ReadOnlySequence<byte>.Empty, isNull: true);
                 }
 
                 if (reader.TryConsumeAsBuffer(bodySize, out var payload))
@@ -1883,7 +1888,7 @@ namespace StackExchange.Redis
                         case ConsumeResult.NeedMoreData:
                             break; // see NilResult below
                         case ConsumeResult.Success:
-                            return new RawResult(type, payload);
+                            return new RawResult(type, payload, isNull: false);
                         default:
                             throw ExceptionFactory.ConnectionFailure(includeDetailInExceptions, ConnectionFailureType.ProtocolFailure, "Invalid bulk string terminator", server);
                     }
@@ -1900,7 +1905,7 @@ namespace StackExchange.Redis
             var payload = reader.ConsumeAsBuffer(crlfOffsetFromCurrent);
             reader.Consume(2);
 
-            return new RawResult(type, payload);
+            return new RawResult(type, payload, isNull: false);
         }
 
         internal enum ReadStatus
@@ -1960,7 +1965,6 @@ namespace StackExchange.Redis
                     case '*': // array
                         reader.Consume(1);
                         return ReadArray(ResultType.Array, arena, in buffer, ref reader, includeDetilInExceptions, server);
-
                     // RESP3
                     case '_': // null
                         reader.Consume(1);
@@ -2015,9 +2019,9 @@ namespace StackExchange.Redis
             var iter = block.GetEnumerator();
             foreach (var token in line.GetInlineTokenizer())
             {   // this assigns *via a reference*, returned via the iterator; just... sweet
-                iter.GetNext() = new RawResult(line.Resp2Type, token); // spoof RESP2 from RESP1
+                iter.GetNext() = new RawResult(line.Resp3Type, token, isNull: false); // spoof RESP2 from RESP1
             }
-            return new RawResult(ResultType.Array, block); // spoof RESP2 from RESP1
+            return new RawResult(ResultType.Array, block, isNull: false); // spoof RESP2 from RESP1
         }
     }
 }

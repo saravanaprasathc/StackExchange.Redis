@@ -1,4 +1,6 @@
-﻿override StackExchange.Redis.Role.Master.Replica.ToString() -> string!
+﻿abstract StackExchange.Redis.RedisResult.ToString(out string? type) -> string?
+override sealed StackExchange.Redis.RedisResult.ToString() -> string!
+override StackExchange.Redis.Role.Master.Replica.ToString() -> string!
 StackExchange.Redis.ConfigurationOptions.Protocol.get -> string?
 StackExchange.Redis.ConfigurationOptions.Protocol.set -> void
 StackExchange.Redis.RedisFeatures.Equals(StackExchange.Redis.RedisFeatures other) -> bool
@@ -12,7 +14,6 @@ StackExchange.Redis.ResultType.BigInteger = 17 -> StackExchange.Redis.ResultType
 StackExchange.Redis.ResultType.BlobError = 10 -> StackExchange.Redis.ResultType
 StackExchange.Redis.ResultType.Boolean = 11 -> StackExchange.Redis.ResultType
 StackExchange.Redis.ResultType.Double = 9 -> StackExchange.Redis.ResultType
-StackExchange.Redis.ResultType.Hello = 45 -> StackExchange.Redis.ResultType
 StackExchange.Redis.ResultType.Map = 13 -> StackExchange.Redis.ResultType
 StackExchange.Redis.ResultType.Null = 8 -> StackExchange.Redis.ResultType
 StackExchange.Redis.ResultType.Push = 37 -> StackExchange.Redis.ResultType

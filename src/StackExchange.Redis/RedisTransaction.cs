@@ -199,7 +199,7 @@ namespace StackExchange.Redis
 
             protected override bool SetResultCore(PhysicalConnection connection, Message message, in RawResult result)
             {
-                if (result.Resp2Type == ResultType.SimpleString && result.IsEqual(CommonReplies.QUEUED))
+                if (result.Resp2TypeBulkString == ResultType.SimpleString && result.IsEqual(CommonReplies.QUEUED))
                 {
                     if (message is QueuedMessage q)
                     {
@@ -485,7 +485,7 @@ namespace StackExchange.Redis
                 if (message is TransactionMessage tran)
                 {
                     var wrapped = tran.InnerOperations;
-                    switch (result.Resp2Type)
+                    switch (result.Resp2TypeArray)
                     {
                         case ResultType.SimpleString:
                             if (tran.IsAborted && result.IsEqual(CommonReplies.OK))

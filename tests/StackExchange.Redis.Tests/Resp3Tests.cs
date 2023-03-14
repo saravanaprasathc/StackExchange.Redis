@@ -1,4 +1,7 @@
-﻿using System;
+﻿using Castle.Components.DictionaryAdapter;
+using NSubstitute;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
@@ -141,6 +144,146 @@ public sealed class Resp3Tests : TestBase
         }
     }
 
+
+    [Theory]
+    //[InlineData("return 42", false, ResultType.Integer, ResultType.Integer, 42)]
+    //[InlineData("return 'abc'", false, ResultType.BulkString, ResultType.BulkString, "abc")]
+    //[InlineData(@"return {1,2,3}", false, ResultType.Array, ResultType.Array, ARR_123)]
+    //[InlineData("return nil", false, ResultType.BulkString, ResultType.Null, null)]
+    //[InlineData(@"return redis.pcall('hgetall', 'key')", false, ResultType.Array, ResultType.Array, MAP_ABC)]
+    //[InlineData("return true", false, ResultType.Integer, ResultType.Integer, 1)]
+
+    //[InlineData("return 42", true, ResultType.Integer, ResultType.Integer, 42)]
+    //[InlineData("return 'abc'", true, ResultType.BulkString, ResultType.BulkString, "abc")]
+    //[InlineData("return {1,2,3}", true, ResultType.Array, ResultType.Array, ARR_123)]
+    //[InlineData("return nil", true, ResultType.BulkString, ResultType.Null, null)]
+    //[InlineData(@"return redis.pcall('hgetall', 'key')", true, ResultType.Array, ResultType.Array, MAP_ABC)]
+    //[InlineData("return true", true, ResultType.Integer, ResultType.Integer, 1)]
+
+
+    [InlineData("incrby", false, ResultType.Integer, ResultType.Integer, 42, "ikey", 2)]
+    [InlineData("incrby", true, ResultType.Integer, ResultType.Integer, 42, "ikey", 2)]
+    [InlineData("incrby", false, ResultType.Integer, ResultType.Integer, 2, "nkey", 2)]
+    [InlineData("incrby", true, ResultType.Integer, ResultType.Integer, 2, "nkey", 2)]
+
+    [InlineData("get", false, ResultType.BulkString, ResultType.BulkString, "40", "ikey")]
+    [InlineData("get", true, ResultType.BulkString, ResultType.BulkString, "40", "ikey")]
+    [InlineData("get", false, ResultType.BulkString, ResultType.Null, null, "nkey")]
+    [InlineData("get", true, ResultType.BulkString, ResultType.Null, null, "nkey")]
+
+    [InlineData("smembers", false, ResultType.Array, ResultType.Array, SET_ABC, "skey")]
+    [InlineData("smembers", true, ResultType.Array, ResultType.Set, SET_ABC, "skey")]
+    [InlineData("smembers", false, ResultType.Array, ResultType.Array, EMPTY_ARR, "nkey")]
+    [InlineData("smembers", true, ResultType.Array, ResultType.Array, EMPTY_ARR, "nkey")]
+
+    [InlineData("hgetall", false, ResultType.Array, ResultType.Array, MAP_ABC, "hkey")]
+    [InlineData("hgetall", true, ResultType.Array, ResultType.Map, MAP_ABC, "hkey")]
+    [InlineData("hgetall", false, ResultType.Array, ResultType.Array, EMPTY_ARR, "nkey")]
+    [InlineData("hgetall", true, ResultType.Array, ResultType.Array, EMPTY_ARR, "nkey")]
+
+    [InlineData("sismember", false, ResultType.Integer, ResultType.Integer, true, "skey", "b")]
+    [InlineData("sismember", true, ResultType.Integer, ResultType.Integer, true, "skey", "b")]
+    [InlineData("sismember", false, ResultType.Integer, ResultType.Integer, false, "nkey", "b")]
+    [InlineData("sismember", true, ResultType.Integer, ResultType.Integer, false, "nkey", "b")]
+    [InlineData("sismember", false, ResultType.Integer, ResultType.Integer, false, "skey", "d")]
+    [InlineData("sismember", true, ResultType.Integer, ResultType.Integer, false, "skey", "d")]
+
+    [InlineData("latency", false, ResultType.BulkString, ResultType.BulkString, STR_DAVE, "doctor")]
+    [InlineData("latency", true, ResultType.BulkString, ResultType.VerbatimString, STR_DAVE, "doctor")]
+    public async Task CheckCommandRespult(string command, bool useResp3, ResultType resp2, ResultType resp3, object expected, params object[] args)
+    {
+        using var muxer = Create(protocol: useResp3 ? "resp3" : "resp2", require: RedisFeatures.v6_0_0);
+        Assert.Equal(useResp3, muxer.GetServerEndPoint(muxer.GetEndPoints().Single()).IsResp3);
+
+        var db = muxer.GetDatabase();
+        if (args.Length > 0)
+        {
+            await db.KeyDeleteAsync((string)args[0]);
+            switch (args[0])
+            {
+                case "ikey":
+                    await db.StringSetAsync("ikey", "40");
+                    break;
+                case "skey":
+                    await db.SetAddAsync("skey", new RedisValue[] { "a", "b", "c" });
+                    break;
+                case "hkey":
+                    await db.HashSetAsync("hkey", new HashEntry[] { new("a", 1), new("b", 2), new("c",3) });
+                    break;
+            }
+        }
+        var result = await db.ExecuteAsync(command, args);
+        Assert.Equal(resp2, result.Resp2Type);
+        Assert.Equal(resp3, result.Resp3Type);
+
+        switch (expected)
+        {
+            case null:
+                Assert.True(result.IsNull);
+                break;
+            case EMPTY_ARR:
+                Assert.Equal(0, result.Length);
+                break;
+            case ARR_123:
+                Assert.Equal(3, result.Length);
+                for (int i = 0; i < result.Length; i++)
+                {
+                    Assert.Equal(i + 1, result[i].AsInt32());
+                }
+                break;
+            case STR_DAVE:
+                var scontent = result.ToString();
+                Assert.NotNull(scontent);
+                Assert.StartsWith("Dave,", scontent);
+                LogNoTime(scontent);
+
+                scontent = result.ToString(out var type);
+                Assert.NotNull(scontent);
+                Assert.StartsWith("Dave,", scontent);
+                LogNoTime(scontent);
+                if (useResp3)
+                {
+                    Assert.Equal("txt", type); 
+                }
+                else
+                {
+                    Assert.Null(type);
+                }
+                break;
+            case SET_ABC:
+                Assert.Equal(3, result.Length);
+                var arr = result.AsStringArray()!;
+                Assert.Contains("a", arr);
+                Assert.Contains("b", arr);
+                Assert.Contains("c", arr);
+                break;
+            case MAP_ABC:
+                var map = result.ToDictionary();
+                Assert.Equal(3, map.Count);
+                Assert.True(map.TryGetValue("a", out var value));
+                Assert.Equal(1, value.AsInt32());
+                Assert.True(map.TryGetValue("b", out value));
+                Assert.Equal(2, value.AsInt32());
+                Assert.True(map.TryGetValue("c", out value));
+                Assert.Equal(3, value.AsInt32());
+                break;
+            case string s:
+                Assert.Equal(s, result.AsString());
+                break;
+            case int i:
+                Assert.Equal(i, result.AsInt32());
+                break;
+            case bool b:
+                Assert.Equal(b, result.AsBoolean());
+                break;
+        }
+
+
+    }
+
+    private const string SET_ABC = nameof(SET_ABC);
     private const string ARR_123 = nameof(ARR_123);
     private const string MAP_ABC = nameof(MAP_ABC);
+    private const string EMPTY_ARR = nameof(EMPTY_ARR);
+    private const string STR_DAVE = nameof(STR_DAVE);
 }
