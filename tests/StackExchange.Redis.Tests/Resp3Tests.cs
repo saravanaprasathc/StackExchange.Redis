@@ -209,6 +209,42 @@ public sealed class Resp3Tests : TestBase
 
     [InlineData("incrbyfloat", false, ResultType.BulkString, ResultType.BulkString, 41.5, "ikey", 1.5)]
     [InlineData("incrbyfloat", true, ResultType.BulkString, ResultType.BulkString, 41.5, "ikey", 1.5)]
+
+    /* DEBUG PROTOCOL <type>
+     * Reply with a test value of the specified type. <type> can be: string,
+     * integer, double, bignum, null, array, set, map, attrib, push, verbatim,
+     * true, false.,
+     */
+    [InlineData("debug", false, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "string")]
+    [InlineData("debug", true, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "string")]
+
+    [InlineData("debug", false, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "double")]
+    [InlineData("debug", true, ResultType.BulkString, ResultType.Double, ANY, "protocol", "double")]
+
+    [InlineData("debug", false, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "bignum")]
+    [InlineData("debug", true, ResultType.BulkString, ResultType.BigInteger, ANY, "protocol", "bignum")]
+
+    [InlineData("debug", false, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "null")]
+    [InlineData("debug", true, ResultType.None, ResultType.Null, ANY, "protocol", "null")]
+
+    [InlineData("debug", false, ResultType.Array, ResultType.Array, ANY, "protocol", "array")]
+    [InlineData("debug", true, ResultType.Array, ResultType.Array, ANY, "protocol", "array")]
+
+    [InlineData("debug", false, ResultType.Array, ResultType.Array, ANY, "protocol", "set")]
+    [InlineData("debug", true, ResultType.Array, ResultType.Set, ANY, "protocol", "set")]
+
+    [InlineData("debug", false, ResultType.Array, ResultType.Array, ANY, "protocol", "map")]
+    [InlineData("debug", true, ResultType.Array, ResultType.Map, ANY, "protocol", "map")]
+
+    [InlineData("debug", false, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "verbatim")]
+    [InlineData("debug", true, ResultType.BulkString, ResultType.VerbatimString, ANY, "protocol", "verbatim")]
+
+    [InlineData("debug", false, ResultType.Integer, ResultType.Integer, true, "protocol", "true")]
+    [InlineData("debug", true, ResultType.Integer, ResultType.Boolean, true, "protocol", "true")]
+
+    [InlineData("debug", false, ResultType.Integer, ResultType.Integer, false, "protocol", "false")]
+    [InlineData("debug", true, ResultType.Integer, ResultType.Boolean, false, "protocol", "false")]
+
     public async Task CheckCommandResult(string command, bool useResp3, ResultType resp2, ResultType resp3, object expected, params object[] args)
     {
         using var muxer = Create(protocol: useResp3 ? "resp3" : "resp2", require: RedisFeatures.v6_0_0);
@@ -239,6 +275,9 @@ public sealed class Resp3Tests : TestBase
         {
             case null:
                 Assert.True(result.IsNull);
+                break;
+            case ANY:
+                // not checked beyond type
                 break;
             case EMPTY_ARR:
                 Assert.Equal(0, result.Length);
@@ -297,6 +336,8 @@ public sealed class Resp3Tests : TestBase
                 break;
             case bool b:
                 Assert.Equal(b, result.AsBoolean());
+                Assert.Equal(b ? 1 : 0, result.AsInt32());
+                Assert.Equal(b ? 1 : 0, result.AsInt64());
                 break;
         }
 
@@ -308,4 +349,5 @@ public sealed class Resp3Tests : TestBase
     private const string MAP_ABC = nameof(MAP_ABC);
     private const string EMPTY_ARR = nameof(EMPTY_ARR);
     private const string STR_DAVE = nameof(STR_DAVE);
+    private const string ANY = nameof(ANY);
 }
