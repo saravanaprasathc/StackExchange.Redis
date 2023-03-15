@@ -28,4 +28,4 @@ Historically, you could use the `RedisResult.Type` property to query the type of
 No changes to existing code are *required*, but:
 
 1. to prevent build warnings, replace usage of `ResultType.MultiBulk` with `ResultType.Array`, and usage of `RedisResult.Type` with `RedisResult.Resp2Type`
-2. if you wish to explit the additional semantic data when using RESP3 and `Execute[Async](string command, ...)`, use `RedisResult.Resp3Type` where appropriate
+2. if you wish to exploit the additional semantic data when using RESP3 and `Execute[Async](string command, ...)`, use `RedisResult.Resp3Type` where appropriate
