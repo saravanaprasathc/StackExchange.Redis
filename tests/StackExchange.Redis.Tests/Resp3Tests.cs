@@ -14,13 +14,14 @@ public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDepe
         private IInternalConnectionMultiplexer? resp2, resp3;
         internal IInternalConnectionMultiplexer GetConnection(TestBase obj, bool useResp3, [CallerMemberName] string caller = "")
         {
+            Version? require = useResp3 ? RedisFeatures.v6_0_0 : null;
             if (useResp3)
             {
-                return resp3 ??= obj.Create(protocol: "resp3", require: RedisFeatures.v6_0_0, caller: caller);
+                return resp3 ??= obj.Create(protocol: "resp3", require: require, caller: caller);
             }
             else
             {
-                return resp2 ??= obj.Create(protocol: "resp2", require: RedisFeatures.v6_0_0, caller: caller);
+                return resp2 ??= obj.Create(protocol: "resp2", require: require, caller: caller);
             }
         }
 
@@ -108,7 +109,12 @@ public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDepe
 
         using var muxer = await ConnectionMultiplexer.ConnectAsync(config, Writer);
         await muxer.GetDatabase().PingAsync(); // is connected
-        Assert.Equal(isResp3, muxer.GetServerEndPoint(muxer.GetEndPoints()[0]).IsResp3);
+        var ep = muxer.GetServerEndPoint(muxer.GetEndPoints()[0]);
+        if (!ep.GetFeatures().Resp3) // this is just a v6 check
+        {
+            isResp3 = false; // then, no: it won't be
+        }
+        Assert.Equal(isResp3, ep.IsResp3);
         var result = await muxer.GetDatabase().ExecuteAsync("latency", "doctor");
         Assert.Equal(isResp3 ? ResultType.VerbatimString : ResultType.BulkString, result.Resp3Type);
     }
@@ -127,10 +133,9 @@ public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDepe
     [InlineData("return nil", true, ResultType.BulkString, ResultType.Null, null)]
     [InlineData(@"return redis.pcall('hgetall', 'key')", true, ResultType.Array, ResultType.Array, MAP_ABC)]
     [InlineData("return true", true, ResultType.Integer, ResultType.Integer, 1)]
-    public async Task CheckLuaRespult(string script, bool useResp3, ResultType resp2, ResultType resp3, object expected)
+    public async Task CheckLuaResult(string script, bool useResp3, ResultType resp2, ResultType resp3, object expected)
     {
         // note Lua does not appear to return RESP3 types in any scenarios
-
         var muxer = Fixture.GetConnection(this, useResp3);
         Assert.Equal(useResp3, muxer.GetServerEndPoint(muxer.GetEndPoints().Single()).IsResp3);
 
