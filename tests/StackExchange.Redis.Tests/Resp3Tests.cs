@@ -140,12 +140,14 @@ public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDepe
     [InlineData(@"return redis.pcall('hgetall', 'key')", false, ResultType.Array, ResultType.Array, MAP_ABC)]
     [InlineData(@"redis.setresp(3)
 return redis.pcall('hgetall', 'key')", false, ResultType.Array, ResultType.Array, MAP_ABC)]
-    [InlineData("return true", false, ResultType.Integer, ResultType.Integer, 1)]
-    [InlineData("return false", false, ResultType.BulkString, ResultType.Null, null)]
+    [InlineData("return true", false, ResultType.Integer, ResultType.Integer, 1, 1, 6)]
+    [InlineData("return false", false, ResultType.BulkString, ResultType.Null, null, 1, 6)]
+    [InlineData("return true", false, ResultType.Integer, ResultType.Integer, 1, 7)]
+    [InlineData("return false", false, ResultType.Integer, ResultType.Integer, 0, 7)]
 
-    [InlineData("return { map = { a = 1, b = 2, c = 3 } }", false, ResultType.Array, ResultType.Array, MAP_ABC)]
-    [InlineData("return { set = { a = 1, b = 2, c = 3 } }", false, ResultType.Array, ResultType.Array, SET_ABC)]
-    [InlineData("return { double = 42 }", false, ResultType.BulkString, ResultType.BulkString, 42.0)]
+    [InlineData("return { map = { a = 1, b = 2, c = 3 } }", false, ResultType.Array, ResultType.Array, MAP_ABC, 6)]
+    [InlineData("return { set = { a = 1, b = 2, c = 3 } }", false, ResultType.Array, ResultType.Array, SET_ABC, 6)]
+    [InlineData("return { double = 42 }", false, ResultType.BulkString, ResultType.BulkString, 42.0, 6)]
 
     [InlineData("return 42", true, ResultType.Integer, ResultType.Integer, 42)]
     [InlineData("return 'abc'", true, ResultType.BulkString, ResultType.BulkString, "abc")]
@@ -154,18 +156,28 @@ return redis.pcall('hgetall', 'key')", false, ResultType.Array, ResultType.Array
     [InlineData(@"return redis.pcall('hgetall', 'key')", true, ResultType.Array, ResultType.Array, MAP_ABC)]
     [InlineData(@"redis.setresp(3)
 return redis.pcall('hgetall', 'key')", true, ResultType.Array, ResultType.Map, MAP_ABC)]
-    [InlineData("return true", true, ResultType.Integer, ResultType.Integer, 1)]
-    [InlineData("return false", true, ResultType.BulkString, ResultType.Null, null)]
+    [InlineData("return true", true, ResultType.Integer, ResultType.Integer, 1, 1, 6)]
+    [InlineData("return false", true, ResultType.BulkString, ResultType.Null, null, 1, 6)]
+    [InlineData("return true", true, ResultType.Integer, ResultType.Boolean, true, 7)]
+    [InlineData("return false", true, ResultType.Integer, ResultType.Boolean, false, 7)]
 
-    [InlineData("return { map = { a = 1, b = 2, c = 3 } }", true, ResultType.Array, ResultType.Map, MAP_ABC)]
-    [InlineData("return { set = { a = 1, b = 2, c = 3 } }", true, ResultType.Array, ResultType.Set, SET_ABC)]
-    [InlineData("return { double = 42 }", true, ResultType.SimpleString, ResultType.Double, 42.0)]
-    public async Task CheckLuaResult(string script, bool useResp3, ResultType resp2, ResultType resp3, object expected)
+    [InlineData("return { map = { a = 1, b = 2, c = 3 } }", true, ResultType.Array, ResultType.Map, MAP_ABC, 6)]
+    [InlineData("return { set = { a = 1, b = 2, c = 3 } }", true, ResultType.Array, ResultType.Set, SET_ABC, 6)]
+    [InlineData("return { double = 42 }", true, ResultType.SimpleString, ResultType.Double, 42.0, 6)]
+    public async Task CheckLuaResult(string script, bool useResp3, ResultType resp2, ResultType resp3, object expected, int serverMin = 1, int serverMax = int.MaxValue)
     {
         // note Lua does not appear to return RESP3 types in any scenarios
         var muxer = Fixture.GetConnection(this, useResp3);
         var ep = muxer.GetServerEndPoint(muxer.GetEndPoints().Single());
-        if (script.Contains("redis.setresp(3)") && !ep.GetFeatures().Resp3 /* v6 check */ )
+        if (ep.Version.Major < serverMin || ep.Version.Major > serverMax)
+        {
+            if (serverMax == int.MaxValue)
+            {
+                Skip.Inconclusive($"applies to v{serverMin} onwards - detected v{ep.Version.Major}");
+            }
+            Skip.Inconclusive($"applies to v{serverMin}-v{serverMax} - detected v{ep.Version.Major}");
+        }
+        if (script.Contains("redis.setresp(3)") && !ep.GetFeatures().Resp3) /* v6 check */
         {
             Skip.Inconclusive("debug protocol not available");
         }
