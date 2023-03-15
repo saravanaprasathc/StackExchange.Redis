@@ -29,6 +29,7 @@ namespace StackExchange.Redis
                 case ResultType.Integer:
                 case ResultType.BulkString:
                 case ResultType.Double:
+                case ResultType.Boolean:
                 case ResultType.BlobError:
                 case ResultType.VerbatimString:
                 case ResultType.BigInteger:

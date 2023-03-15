@@ -1,17 +1,37 @@
-﻿using Castle.Components.DictionaryAdapter;
-using NSubstitute;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace StackExchange.Redis.Tests;
 
-public sealed class Resp3Tests : TestBase
+public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDependentConnectionCache>
 {
-    public Resp3Tests(ITestOutputHelper output) : base(output) { }
+    public class ProtocolDependentConnectionCache : IDisposable // without this, test perf is intolerable
+    {
+        private IInternalConnectionMultiplexer? resp2, resp3;
+        internal IInternalConnectionMultiplexer GetConnection(TestBase obj, bool useResp3, [CallerMemberName] string caller = "")
+        {
+            if (useResp3)
+            {
+                return resp3 ??= obj.Create(protocol: "resp3", require: RedisFeatures.v6_0_0, caller: caller);
+            }
+            else
+            {
+                return resp2 ??= obj.Create(protocol: "resp2", require: RedisFeatures.v6_0_0, caller: caller);
+            }
+        }
+
+        public void Dispose()
+        {
+            resp2?.Dispose();
+            resp3?.Dispose();
+        }
+    }
+    public Resp3Tests(ITestOutputHelper output, ProtocolDependentConnectionCache fixture) : base(output)
+        => Fixture = fixture;
 
     [Theory]
     // specify nothing
@@ -66,14 +86,13 @@ public sealed class Resp3Tests : TestBase
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task TryConnect(bool resp3)
+    public async Task TryConnect(bool useResp3)
     {
-
-        using var muxer = Create(protocol: resp3 ? "resp3" : "resp2", require: RedisFeatures.v6_0_0);
+        var muxer = Fixture.GetConnection(this, useResp3);
         await muxer.GetDatabase().PingAsync();
 
         var server = muxer.GetServerEndPoint(muxer.GetEndPoints().Single());
-        Assert.Equal(resp3, server.IsResp3);
+        Assert.Equal(useResp3, server.IsResp3);
         Assert.NotNull(server.GetBridge(RedisCommand.GET)?.ClientId);
     }
 
@@ -86,6 +105,7 @@ public sealed class Resp3Tests : TestBase
         config.Password = TestConfig.Current.SecurePassword;
         config.DefaultVersion = new Version("6.0");
         config.CommandMap = CommandMap.Create(new() { ["hello"] = command });
+
         using var muxer = await ConnectionMultiplexer.ConnectAsync(config, Writer);
         await muxer.GetDatabase().PingAsync(); // is connected
         Assert.Equal(isResp3, muxer.GetServerEndPoint(muxer.GetEndPoints()[0]).IsResp3);
@@ -111,7 +131,7 @@ public sealed class Resp3Tests : TestBase
     {
         // note Lua does not appear to return RESP3 types in any scenarios
 
-        using var muxer = Create(protocol: useResp3 ? "resp3" : "resp2", require: RedisFeatures.v6_0_0);
+        var muxer = Fixture.GetConnection(this, useResp3);
         Assert.Equal(useResp3, muxer.GetServerEndPoint(muxer.GetEndPoints().Single()).IsResp3);
 
         var db = muxer.GetDatabase();
@@ -219,13 +239,13 @@ public sealed class Resp3Tests : TestBase
     [InlineData("debug", true, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "string")]
 
     [InlineData("debug", false, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "double")]
-    [InlineData("debug", true, ResultType.BulkString, ResultType.Double, ANY, "protocol", "double")]
+    [InlineData("debug", true, ResultType.SimpleString, ResultType.Double, ANY, "protocol", "double")]
 
     [InlineData("debug", false, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "bignum")]
-    [InlineData("debug", true, ResultType.BulkString, ResultType.BigInteger, ANY, "protocol", "bignum")]
+    [InlineData("debug", true, ResultType.SimpleString, ResultType.BigInteger, ANY, "protocol", "bignum")]
 
-    [InlineData("debug", false, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "null")]
-    [InlineData("debug", true, ResultType.None, ResultType.Null, ANY, "protocol", "null")]
+    [InlineData("debug", false, ResultType.BulkString, ResultType.Null, null, "protocol", "null")]
+    [InlineData("debug", true, ResultType.BulkString, ResultType.Null, null, "protocol", "null")]
 
     [InlineData("debug", false, ResultType.Array, ResultType.Array, ANY, "protocol", "array")]
     [InlineData("debug", true, ResultType.Array, ResultType.Array, ANY, "protocol", "array")]
@@ -247,7 +267,7 @@ public sealed class Resp3Tests : TestBase
 
     public async Task CheckCommandResult(string command, bool useResp3, ResultType resp2, ResultType resp3, object expected, params object[] args)
     {
-        using var muxer = Create(protocol: useResp3 ? "resp3" : "resp2", require: RedisFeatures.v6_0_0);
+        var muxer = Fixture.GetConnection(this, useResp3);
         Assert.Equal(useResp3, muxer.GetServerEndPoint(muxer.GetEndPoints().Single()).IsResp3);
 
         var db = muxer.GetDatabase();
@@ -350,4 +370,6 @@ public sealed class Resp3Tests : TestBase
     private const string EMPTY_ARR = nameof(EMPTY_ARR);
     private const string STR_DAVE = nameof(STR_DAVE);
     private const string ANY = nameof(ANY);
+
+    public ProtocolDependentConnectionCache Fixture { get; }
 }
