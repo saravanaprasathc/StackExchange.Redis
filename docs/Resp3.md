@@ -16,8 +16,14 @@ RESP3 requires a Redis server version 6 or above; since the library cannot autom
 the library currently requires a hint to enable this mode, in particular, configuring the `ConfigurationOptions.Version` property to 6 (or above), or using
 `,version=6.0` (or above) on the configuration string.
 
-When using StackExchange.Redis, the second point only applies to commands (in particular: *modules*) that are invoked via the ad-hoc
-`Execute[Async](string command, ...)` APIs, which return `RedisResult`. **If you are not using this API, you do not need to do anything.**
+When using StackExchange.Redis, the second point only applies to:
+
+- Lua scripts that are invoked via the `ScriptEvaluate[Async](...)` or related APIs, that either:
+  - uses the `redis.setresp(3)` API and returns a value from `redis.[p]call(...)`
+  - returns a value that satisfies the [LUA to RESP3 type conversion rules](https://redis.io/docs/manual/programmability/lua-api/#lua-to-resp3-type-conversion)
+- ad-hoc commands (in particular: *modules*) that are invoked via the `Execute[Async](string command, ...)` API
+
+both which return `RedisResult`. **If you are not using these APIs, you do not need to do anything.**
 
 Historically, you could use the `RedisResult.Type` property to query the type of data returned (integer, string, etc). In particular:
 

@@ -138,19 +138,38 @@ public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDepe
     [InlineData(@"return {1,2,3}", false, ResultType.Array, ResultType.Array, ARR_123)]
     [InlineData("return nil", false, ResultType.BulkString, ResultType.Null, null)]
     [InlineData(@"return redis.pcall('hgetall', 'key')", false, ResultType.Array, ResultType.Array, MAP_ABC)]
+    [InlineData(@"redis.setresp(3)
+return redis.pcall('hgetall', 'key')", false, ResultType.Array, ResultType.Array, MAP_ABC)]
     [InlineData("return true", false, ResultType.Integer, ResultType.Integer, 1)]
+    [InlineData("return false", false, ResultType.BulkString, ResultType.Null, null)]
+
+    [InlineData("return { map = { a = 1, b = 2, c = 3 } }", false, ResultType.Array, ResultType.Array, MAP_ABC)]
+    [InlineData("return { set = { a = 1, b = 2, c = 3 } }", false, ResultType.Array, ResultType.Array, SET_ABC)]
+    [InlineData("return { double = 42 }", false, ResultType.BulkString, ResultType.BulkString, 42.0)]
 
     [InlineData("return 42", true, ResultType.Integer, ResultType.Integer, 42)]
     [InlineData("return 'abc'", true, ResultType.BulkString, ResultType.BulkString, "abc")]
     [InlineData("return {1,2,3}", true, ResultType.Array, ResultType.Array, ARR_123)]
     [InlineData("return nil", true, ResultType.BulkString, ResultType.Null, null)]
     [InlineData(@"return redis.pcall('hgetall', 'key')", true, ResultType.Array, ResultType.Array, MAP_ABC)]
+    [InlineData(@"redis.setresp(3)
+return redis.pcall('hgetall', 'key')", true, ResultType.Array, ResultType.Map, MAP_ABC)]
     [InlineData("return true", true, ResultType.Integer, ResultType.Integer, 1)]
+    [InlineData("return false", true, ResultType.BulkString, ResultType.Null, null)]
+
+    [InlineData("return { map = { a = 1, b = 2, c = 3 } }", true, ResultType.Array, ResultType.Map, MAP_ABC)]
+    [InlineData("return { set = { a = 1, b = 2, c = 3 } }", true, ResultType.Array, ResultType.Set, SET_ABC)]
+    [InlineData("return { double = 42 }", true, ResultType.SimpleString, ResultType.Double, 42.0)]
     public async Task CheckLuaResult(string script, bool useResp3, ResultType resp2, ResultType resp3, object expected)
     {
         // note Lua does not appear to return RESP3 types in any scenarios
         var muxer = Fixture.GetConnection(this, useResp3);
-        Assert.Equal(useResp3, muxer.GetServerEndPoint(muxer.GetEndPoints().Single()).IsResp3);
+        var ep = muxer.GetServerEndPoint(muxer.GetEndPoints().Single());
+        if (script.Contains("redis.setresp(3)") && !ep.GetFeatures().Resp3 /* v6 check */ )
+        {
+            Skip.Inconclusive("debug protocol not available");
+        }
+        Assert.Equal(useResp3, ep.IsResp3);
 
         var db = muxer.GetDatabase();
         if (expected is MAP_ABC)
@@ -186,8 +205,18 @@ public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDepe
                 Assert.True(map.TryGetValue("c", out value));
                 Assert.Equal(3, value.AsInt32());
                 break;
+            case SET_ABC:
+                Assert.Equal(3, result.Length);
+                var arr = result.AsStringArray()!;
+                Assert.Contains("a", arr);
+                Assert.Contains("b", arr);
+                Assert.Contains("c", arr);
+                break;
             case string s:
                 Assert.Equal(s, result.AsString());
+                break;
+            case double d:
+                Assert.Equal(d, result.AsDouble());
                 break;
             case int i:
                 Assert.Equal(i, result.AsInt32());
