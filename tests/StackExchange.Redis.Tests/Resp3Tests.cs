@@ -276,7 +276,12 @@ public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDepe
     public async Task CheckCommandResult(string command, bool useResp3, ResultType resp2, ResultType resp3, object expected, params object[] args)
     {
         var muxer = Fixture.GetConnection(this, useResp3);
-        Assert.Equal(useResp3, muxer.GetServerEndPoint(muxer.GetEndPoints().Single()).IsResp3);
+        var ep = muxer.GetServerEndPoint(muxer.GetEndPoints().Single());
+        if (command == "debug" && args.Length > 0 && args[1] is "protocol" && !ep.GetFeatures().Resp3 /* v6 check */ )
+        {
+            Skip.Inconclusive("debug protocol not available");
+        }
+        Assert.Equal(useResp3, ep.IsResp3);
 
         var db = muxer.GetDatabase();
         if (args.Length > 0)
