@@ -7,6 +7,8 @@ RESP2 and RESP3 are evolutions of the Redis protocol; the main differences are:
 
 For most people, the first point is the main reason to consider RESP3, as in high-usage servers, this can halve the number of connections required.
 This is particularly useful in hosted environments where the number of inbound connections to the server is capped as part of a service plan.
+Alternatively, where users are currently choosing to disable the out-of-band connection to achieve this, they may now be able to re-enable this
+(for example, to receive server maintenance notifications) *without* incurring any additional connection overhead.
 
 There are no significant other differences, i.e. security, performance, etc all perform identically under both RESP2 and RESP3.
 
