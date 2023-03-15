@@ -290,7 +290,7 @@ public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDepe
     {
         var muxer = Fixture.GetConnection(this, useResp3);
         var ep = muxer.GetServerEndPoint(muxer.GetEndPoints().Single());
-        if (command == "debug" && args.Length > 0 && args[1] is "protocol" && !ep.GetFeatures().Resp3 /* v6 check */ )
+        if (command == "debug" && args.Length > 0 && args[0] is "protocol" && !ep.GetFeatures().Resp3 /* v6 check */ )
         {
             Skip.Inconclusive("debug protocol not available");
         }
