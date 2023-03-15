@@ -234,6 +234,9 @@ public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDepe
      * Reply with a test value of the specified type. <type> can be: string,
      * integer, double, bignum, null, array, set, map, attrib, push, verbatim,
      * true, false.,
+     *
+     * NOTE: "debug protocol" may be disabled in later default server configs; if this starts
+     * failing when we upgrade the test server: update the config to re-enable the command
      */
     [InlineData("debug", false, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "string")]
     [InlineData("debug", true, ResultType.BulkString, ResultType.BulkString, ANY, "protocol", "string")]

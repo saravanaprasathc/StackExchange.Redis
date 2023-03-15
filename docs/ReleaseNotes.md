@@ -8,7 +8,7 @@ Current package versions:
 
 ## Unreleased
 
-No pending changes.
+- Adds: RESP3 support ([#2396 by mgravell](https://github.com/StackExchange/StackExchange.Redis/pull/2396)) - see https://stackexchange.github.io/StackExchange.Redis/Resp3
 
 ## 2.6.96
 
