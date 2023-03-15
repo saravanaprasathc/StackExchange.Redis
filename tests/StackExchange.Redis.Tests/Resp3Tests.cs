@@ -93,8 +93,21 @@ public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDepe
         await muxer.GetDatabase().PingAsync();
 
         var server = muxer.GetServerEndPoint(muxer.GetEndPoints().Single());
+        if (!server.GetFeatures().Resp3)
+        {
+            useResp3 = false; // can't be
+        }
+
         Assert.Equal(useResp3, server.IsResp3);
-        Assert.NotNull(server.GetBridge(RedisCommand.GET)?.ClientId);
+        var cid = server.GetBridge(RedisCommand.GET)?.ClientId;
+        if (server.GetFeatures().ClientId)
+        {
+            Assert.NotNull(cid);
+        }
+        else
+        {
+            Assert.Null(cid)
+        }
     }
 
     [Theory]

@@ -63,6 +63,11 @@ namespace StackExchange.Redis
         public bool ClientName => Version.IsAtLeast(v2_6_9);
 
         /// <summary>
+        /// Is <see href="https://redis.io/commands/client-id/">CLIENT ID</see> available?
+        /// </summary>
+        public bool ClientId => Version.IsAtLeast(v5_0_0);
+
+        /// <summary>
         /// Does <see href="https://redis.io/commands/exec/">EXEC</see> support <c>EXECABORT</c> if there are errors?
         /// </summary>
         public bool ExecAbort => Version.IsAtLeast(v2_6_5) && !Version.IsEqual(v2_9_5);
