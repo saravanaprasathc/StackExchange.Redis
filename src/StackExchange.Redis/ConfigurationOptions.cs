@@ -398,6 +398,7 @@ namespace StackExchange.Redis
         /// If <see langword="false"/>, <see cref="ThreadPriority.Normal"/> will be used.
         /// </summary>
         [Obsolete($"This setting no longer has any effect, please use {nameof(SocketManager.SocketManagerOptions)}.{nameof(SocketManager.SocketManagerOptions.UseHighPrioritySocketThreads)} instead - this setting will be removed in 3.0.")]
+        [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         public bool HighPrioritySocketThreads
         {
             get => false;
@@ -449,6 +450,7 @@ namespace StackExchange.Redis
         /// Specifies whether asynchronous operations should be invoked in a way that guarantees their original delivery order.
         /// </summary>
         [Obsolete("Not supported; if you require ordered pub/sub, please see " + nameof(ChannelMessageQueue) + " - this will be removed in 3.0.", false)]
+        [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         public bool PreserveAsyncOrder
         {
             get => false;
@@ -496,6 +498,7 @@ namespace StackExchange.Redis
         /// Specifies the time in milliseconds that the system should allow for responses before concluding that the socket is unhealthy.
         /// </summary>
         [Obsolete("This setting no longer has any effect, and should not be used - will be removed in 3.0.")]
+        [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         public int ResponseTimeout
         {
             get => 0;
@@ -570,6 +573,7 @@ namespace StackExchange.Redis
         /// The size of the output buffer to use.
         /// </summary>
         [Obsolete("This setting no longer has any effect, and should not be used - will be removed in 3.0.")]
+        [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         public int WriteBuffer
         {
             get => 0;

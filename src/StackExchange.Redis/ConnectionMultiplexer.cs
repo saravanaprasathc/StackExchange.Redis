@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
@@ -68,6 +69,7 @@ namespace StackExchange.Redis
         /// Should exceptions include identifiable details? (key names, additional .Data annotations)
         /// </summary>
         [Obsolete($"Please use {nameof(ConfigurationOptions)}.{nameof(ConfigurationOptions.IncludeDetailInExceptions)} instead - this will be removed in 3.0.")]
+        [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         public bool IncludeDetailInExceptions
         {
             get => RawConfig.IncludeDetailInExceptions;
@@ -81,6 +83,7 @@ namespace StackExchange.Redis
         /// CPU usage, etc - note that this can be problematic on some platforms.
         /// </remarks>
         [Obsolete($"Please use {nameof(ConfigurationOptions)}.{nameof(ConfigurationOptions.IncludePerformanceCountersInExceptions)} instead - this will be removed in 3.0.")]
+        [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         public bool IncludePerformanceCountersInExceptions
         {
             get => RawConfig.IncludePerformanceCountersInExceptions;

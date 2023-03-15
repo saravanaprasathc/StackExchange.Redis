@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
@@ -161,6 +162,7 @@ namespace StackExchange.Redis
         /// Indicate the type of result that was received from redis, in RESP2 terms.
         /// </summary>
         [Obsolete($"Please use either {nameof(Resp2Type)} (simplified) or {nameof(Resp3Type)} (full)")]
+        [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         public ResultType Type => Resp2Type;
 
         /// <summary>

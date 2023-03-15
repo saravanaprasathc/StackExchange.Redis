@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 
 namespace StackExchange.Redis
 {
@@ -40,6 +41,7 @@ namespace StackExchange.Redis
         /// Multi-bulk replies represent complex results such as arrays.
         /// </summary>
         [Obsolete("Please use " + nameof(Array))]
+        [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         MultiBulk = 5,
 
         // RESP3: https://github.com/redis/redis-specifications/blob/master/protocol/RESP3.md

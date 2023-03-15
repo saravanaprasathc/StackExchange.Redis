@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Net;
 using System.Threading.Tasks;
@@ -49,6 +50,7 @@ namespace StackExchange.Redis
         /// Gets or sets whether asynchronous operations should be invoked in a way that guarantees their original delivery order.
         /// </summary>
         [Obsolete("Not supported; if you require ordered pub/sub, please see " + nameof(ChannelMessageQueue), false)]
+        [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         bool PreserveAsyncOrder { get; set; }
 
         /// <summary>
@@ -65,6 +67,7 @@ namespace StackExchange.Redis
         /// Should exceptions include identifiable details? (key names, additional <see cref="Exception.Data"/> annotations).
         /// </summary>
         [Obsolete($"Please use {nameof(ConfigurationOptions)}.{nameof(ConfigurationOptions.IncludeDetailInExceptions)} instead - this will be removed in 3.0.")]
+        [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         bool IncludeDetailInExceptions { get; set; }
 
         /// <summary>
