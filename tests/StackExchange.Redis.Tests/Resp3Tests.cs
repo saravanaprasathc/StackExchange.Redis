@@ -106,7 +106,7 @@ public sealed class Resp3Tests : TestBase, IClassFixture<Resp3Tests.ProtocolDepe
         }
         else
         {
-            Assert.Null(cid)
+            Assert.Null(cid);
         }
     }
 
