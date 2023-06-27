@@ -164,3 +164,6 @@ db.StringIncrement(pageKey, flags: CommandFlags.FireAndForget);
   [1]: https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl
   [2]: https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.task.asyncstate
   [3]: https://docs.microsoft.com/en-us/dotnet/api/system.string
+
+ ## <div align=left> < [Server](https://stackexchange.github.io/StackExchange.Redis/Server) </div> 
+ ## <div align=right> > [Configuration](https://stackexchange.github.io/StackExchange.Redis/Configuration) </div>
