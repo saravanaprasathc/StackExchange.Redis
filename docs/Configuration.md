@@ -262,3 +262,6 @@ config.ReconnectRetryPolicy = new LinearRetry(5000);
 //5	        5000
 //6	        5000
 ```
+
+ ## <div align=left> < [Basic Usage](https://stackexchange.github.io/StackExchange.Redis/Basics) </div> 
+ ## <div align=right> > [Pipelines and Multiplexers](https://stackexchange.github.io/StackExchange.Redis/PipelinesMultiplexers) </div>
